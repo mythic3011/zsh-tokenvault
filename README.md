@@ -25,10 +25,17 @@ Zsh plugin for managing provider API keys, profile-scoped defaults, model select
 Clone or copy this repository into:
 
 ```sh
-${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/tokenvault
+git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/tokenvault
 ```
 
 Then add `tokenvault` to the `plugins=(...)` list in `.zshrc`.
+
+    ```sh
+    plugins=( 
+        # other plugins...
+        tokenvault
+    )
+    ```
 
 ### Other zsh plugin managers
 
