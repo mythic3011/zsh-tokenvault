@@ -2,10 +2,12 @@
 [[ -n "${TV_I18N_LOADED:-}" ]] && return 0
 typeset -g TV_I18N_LOADED=1
 
-typeset -g TV_LANG="${TV_LANG:-${LANG%%.*:-en}}"
+typeset -g TV_LANG="${TV_LANG:-${LANG:-en}}"
+TV_LANG="${TV_LANG%%.*}"
 
 _tv_i18n_locale() {
-    local lang="${TV_LANG:-${LANG%%.*:-en}}"
+    local lang="${TV_LANG:-${LANG:-en}}"
+    lang="${lang%%.*}"
     lang=${lang//_/\-}
     lang=${lang:l}
     case "$lang" in

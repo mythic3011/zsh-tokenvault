@@ -8,36 +8,48 @@ typeset -g TV_PROFILE_COMMANDS_LOADED=1
 tv-add() {
     [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ Run tv-unlock first${_TV_RST}"; return 1; }
 
-    local p_id="" prov="" auth_mode="" reset_type="" base_url="" quota_api="" k="" default_model=""
+    local p_id="" prov="" auth_mode="" reset_type="" base_url="" quota_api="" k="" default_model="" cli_mode=0
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -ID)       p_id="$2";        shift 2 ;;
-            -Prov)     prov="$2";        shift 2 ;;
-            -Auth)     auth_mode="$2";   shift 2 ;;
-            -Base)     base_url="$2";    shift 2 ;;
-            -QuotaAPI) quota_api="$2";   shift 2 ;;
-            -Reset)    reset_type="$2";  shift 2 ;;
-            -Key)      k="$2";           shift 2 ;;
-            -Model)    default_model="$2"; shift 2 ;;
+            -ID)       cli_mode=1; p_id="$2";        shift 2 ;;
+            -Prov)     cli_mode=1; prov="$2";        shift 2 ;;
+            -Auth)     cli_mode=1; auth_mode="$2";   shift 2 ;;
+            -Base)     cli_mode=1; base_url="$2";    shift 2 ;;
+            -QuotaAPI) cli_mode=1; quota_api="$2";   shift 2 ;;
+            -Reset)    cli_mode=1; reset_type="$2";  shift 2 ;;
+            -Key)      cli_mode=1; k="$2";           shift 2 ;;
+            -Model)    cli_mode=1; default_model="$2"; shift 2 ;;
             *)         shift ;;
         esac
     done
 
     _tv_banner "Add Profile"
-    _tv_ask p_id "Profile ID"
+    if [[ "$cli_mode" == "1" ]]; then
+        [[ -z "$p_id" ]] && { _tv_print "  ${_TV_RED}✗ Required: -ID${_TV_RST}"; return 1; }
+    else
+        _tv_ask p_id "Profile ID"
+    fi
     [[ -z "$p_id" ]] && { _tv_print "  ${_TV_RED}✗ Required${_TV_RST}"; return 1; }
     _tv_validate_id "$p_id" || return 1
 
-    _tv_menu prov "Provider" 1 \
-        "anthropic" "(Anthropic / Claude)" \
-        "openai"    "(OpenAI / Codex)" \
-        "gemini"    "(Google Gemini)" \
-        "custom"    "(any other provider)"
+    if [[ "$cli_mode" == "1" ]]; then
+        [[ -z "$prov" ]] && { _tv_print "  ${_TV_RED}✗ Required: -Prov${_TV_RST}"; return 1; }
+    else
+        _tv_menu prov "Provider" 1 \
+            "anthropic" "(Anthropic / Claude)" \
+            "openai"    "(OpenAI / Codex)" \
+            "gemini"    "(Google Gemini)" \
+            "custom"    "(any other provider)"
+    fi
 
     if [[ "$prov" != "custom" && -z "$auth_mode" ]]; then
-        _tv_menu auth_mode "Auth mode" 1 \
-            "cli" "(provider's own login — no key stored)" \
-            "key" "(inject API key via env vars)"
+        if [[ "$cli_mode" == "1" ]]; then
+            auth_mode="key"
+        else
+            _tv_menu auth_mode "Auth mode" 1 \
+                "cli" "(provider's own login — no key stored)" \
+                "key" "(inject API key via env vars)"
+        fi
         reset_type="official"
     else
         auth_mode="${auth_mode:-key}"
@@ -45,12 +57,19 @@ tv-add() {
     fi
 
     if [[ "$auth_mode" == "key" ]]; then
-        _tv_ask base_url "Proxy / Base URL (blank = official endpoint)"
+        if [[ "$cli_mode" != "1" ]]; then
+            _tv_ask base_url "Proxy / Base URL (blank = official endpoint)"
+        fi
         if [[ "$prov" == "custom" || -n "$base_url" ]]; then
-            _tv_ask quota_api "Quota check API URL" "$TV_QUOTA_API_URL"
-            _tv_menu reset_type "Reset type" 1 \
-                "daily" "(auto re-enable after quota resets)" \
-                "payg"  "(disable permanently when exhausted)"
+            if [[ "$cli_mode" == "1" ]]; then
+                quota_api="${quota_api:-$TV_QUOTA_API_URL}"
+                reset_type="${reset_type:-daily}"
+            else
+                _tv_ask quota_api "Quota check API URL" "$TV_QUOTA_API_URL"
+                _tv_menu reset_type "Reset type" 1 \
+                    "daily" "(auto re-enable after quota resets)" \
+                    "payg"  "(disable permanently when exhausted)"
+            fi
         fi
     fi
 
@@ -61,20 +80,29 @@ tv-add() {
         gemini)    env_key="GEMINI_API_KEY";    env_token="";                      env_base="";                   env_model="GEMINI_DEFAULT_MODEL" ;;
         *)         env_key="CUSTOM_API_KEY";    env_token="";                      env_base="CUSTOM_BASE_URL";    env_model="CUSTOM_DEFAULT_MODEL" ;;
     esac
-    _tv_print "\n  ${_TV_GRY}Env var names (Enter = keep default)${_TV_RST}"
-    _tv_ask env_key   "Key env"   "$env_key"
-    _tv_ask env_base  "Base env"  "$env_base"
-    _tv_ask env_model "Model env" "$env_model"
-
-    if [[ "$auth_mode" == "key" && -z "$k" ]]; then
-        printf "\n  API Key: "
-        read -rs k
-        echo ""
-        k=${k//[[:space:]]/}
-        [[ -z "$k" ]] && { _tv_print "  ${_TV_RED}✗ Key required${_TV_RST}"; return 1; }
+    if [[ "$cli_mode" != "1" ]]; then
+        _tv_print "\n  ${_TV_GRY}Env var names (Enter = keep default)${_TV_RST}"
+        _tv_ask env_key   "Key env"   "$env_key"
+        _tv_ask env_base  "Base env"  "$env_base"
+        _tv_ask env_model "Model env" "$env_model"
     fi
 
-    [[ "$auth_mode" == "key" && -n "$k" ]] && _tv_pick_model default_model "$prov" "$base_url" "$k"
+    if [[ "$auth_mode" == "key" && -z "$k" ]]; then
+        if [[ "$cli_mode" == "1" ]]; then
+            _tv_print "  ${_TV_RED}✗ Required: -Key${_TV_RST}"
+            return 1
+        else
+            printf "\n  API Key: "
+            read -rs k
+            echo ""
+            k=${k//[[:space:]]/}
+            [[ -z "$k" ]] && { _tv_print "  ${_TV_RED}✗ Key required${_TV_RST}"; return 1; }
+        fi
+    fi
+
+    if [[ "$cli_mode" != "1" && "$auth_mode" == "key" && -n "$k" ]]; then
+        _tv_pick_model default_model "$prov" "$base_url" "$k"
+    fi
 
     local v
     v=$(_tv_crypto dec)

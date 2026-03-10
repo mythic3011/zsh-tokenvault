@@ -1,0 +1,17 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    jq \
+    openssl \
+    python3 \
+    zsh \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY . .
+RUN chmod +x build.sh
+
+CMD ["./build.sh", "local"]

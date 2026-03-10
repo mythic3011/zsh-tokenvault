@@ -3,8 +3,9 @@
 typeset -g TV_PROMPT_LOADED=1
 
 _tv_spawn_worker() {
+    mkdir "$TV_WORKER_LOCK" 2>/dev/null || return 0
+
     (
-        mkdir "$TV_WORKER_LOCK" 2>/dev/null || exit 0
         trap 'rm -rf "$TV_WORKER_LOCK" 2>/dev/null' EXIT
 
         local RST="%f%k%b" RED="%F{196}" GRN="%F{46}" YEL="%F{226}"
@@ -46,9 +47,10 @@ _tv_spawn_worker() {
 
                 [[ -z "$raw_key" ]] && continue
 
-                local st="active" rem=0 reset_at=""
+                local st="$cur_status" rem=0 reset_at=""
 
                 if [[ -n "$quota_api" ]]; then
+                    st="active"
                     local resp
                     resp=$(curl -s -L -m 2 --connect-timeout 2 -G "$quota_api" \
                         --data-urlencode "token_key=$raw_key" -d "page=1" -d "page_size=1")
@@ -60,14 +62,13 @@ _tv_spawn_worker() {
                         st="DEAD"
                         rem=0
                     fi
-                fi
+                    rem=${rem:-0}
 
-                rem=${rem:-0}
-
-                if [[ "$st" != "active" ]]; then
-                    [[ "$reset_type" == "payg" ]] && st="disabled" || st="exhausted"
-                elif [[ "$cur_status" == "exhausted" && "$st" == "active" ]]; then
-                    st="active"
+                    if [[ "$st" != "active" ]]; then
+                        [[ "$reset_type" == "payg" ]] && st="disabled" || st="exhausted"
+                    elif [[ "$cur_status" == "exhausted" && "$st" == "active" ]]; then
+                        st="active"
+                    fi
                 fi
 
                 updated=$(echo "$updated" | jq \

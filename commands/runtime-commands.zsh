@@ -3,8 +3,13 @@
 typeset -g TV_RUNTIME_COMMANDS_LOADED=1
 
 tv-run() {
-    [[ $# -lt 2 ]] && { _tv_print "  ${_TV_GRY}Usage: tv-run <id|auto> <cmd...>${_TV_RST}"; return 1; }
-    [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ Run tv-unlock first${_TV_RST}"; return 1; }
+    emulate -L zsh
+    setopt localoptions noxtrace noverbose typesetsilent
+
+    _tv_run_print() { print -P -- "$1" >&2; }
+
+    [[ $# -lt 2 ]] && { _tv_run_print "  ${_TV_GRY}Usage: tv-run <id|auto> <cmd...>${_TV_RST}"; return 1; }
+    [[ -z "$_TV_MASTER_KEY" ]] && { _tv_run_print "  ${_TV_RED}✗ Run tv-unlock first${_TV_RST}"; return 1; }
 
     local target="$1"
     shift
@@ -17,6 +22,8 @@ tv-run() {
     models_cfg=$(cat "$TV_MODELS" 2>/dev/null || echo "{}")
 
     if [[ "$target" == "auto" ]]; then
+        local -a env_cmd
+        env_cmd=(env)
         local buckets="{}"
         for p in $(echo "$profiles" | jq -r 'keys[]'); do
             local row
@@ -52,14 +59,16 @@ tv-run() {
 
         for prov in $(echo "$profiles" | jq -r '[.[].provider] | unique[]'); do
             local unset_var="_TV_UNSET_${prov}[@]"
-            for v in "${(P)unset_var}"; do unset "$v"; done
+            for v in "${(P)unset_var}"; do
+                env_cmd+=("-u" "$v")
+            done
         done
         for v in "${_TV_UNSET_anthropic[@]}" "${_TV_UNSET_openai[@]}" "${_TV_UNSET_gemini[@]}"; do
-            unset "$v"
+            env_cmd+=("-u" "$v")
         done
 
         if (( n_buckets == 0 )); then
-            _tv_print "  ${_TV_YEL}⚠ No active custom keys — using system session${_TV_RST}"
+            _tv_run_print "  ${_TV_YEL}⚠ No active custom keys — using system session${_TV_RST}"
         else
             for prov in $(echo "$buckets" | jq -r 'keys[]'); do
                 local winner
@@ -70,7 +79,7 @@ tv-run() {
                 winner_rem=$(echo "$winner" | jq -r '.remain')
                 local k
                 k=$(echo "$winner" | jq -r '.key')
-                _tv_print "  ${_TV_GRN}✓ ${prov}${_TV_RST}  ${_TV_GRY}→${_TV_RST} ${_TV_WHT}${winner_id}${_TV_RST}  ${_TV_GRY}($(_tv_fmt_num "$winner_rem") remaining)${_TV_RST}"
+                _tv_run_print "  ${_TV_GRN}✓ ${prov}${_TV_RST}  ${_TV_GRY}→${_TV_RST} ${_TV_WHT}${winner_id}${_TV_RST}  ${_TV_GRY}($(_tv_fmt_num "$winner_rem") remaining)${_TV_RST}"
                 local bu
                 bu=$(echo "$winner" | jq -r '.base_url // ""')
                 local dm
@@ -87,15 +96,15 @@ tv-run() {
                 local env_model
                 env_model=$(echo "$em" | jq -r '.model // empty')
 
-                [[ -n "$env_key"   ]] && export "${env_key}=$k"
-                [[ -n "$env_token" ]] && export "${env_token}=$k"
-                [[ -n "$env_base" && -n "$bu" ]] && export "${env_base}=$bu"
+                [[ -n "$env_key"   ]] && env_cmd+=("${env_key}=$k")
+                [[ -n "$env_token" ]] && env_cmd+=("${env_token}=$k")
+                [[ -n "$env_base" && -n "$bu" ]] && env_cmd+=("${env_base}=$bu")
 
                 local final_model="$dm"
                 if [[ -z "$final_model" ]]; then
                     final_model=$(echo "$models_cfg" | jq -r --arg pv "$prov" '.[$pv].default // empty')
                 fi
-                [[ -n "$env_model" && -n "$final_model" ]] && export "${env_model}=$final_model"
+                [[ -n "$env_model" && -n "$final_model" ]] && env_cmd+=("${env_model}=$final_model")
 
                 if [[ "$prov" == "anthropic" ]]; then
                     local haiku
@@ -106,20 +115,20 @@ tv-run() {
                     opus=$(echo "$models_cfg" | jq -r '.anthropic.opus    // empty')
                     local subagent
                     subagent=$(echo "$models_cfg" | jq -r '.anthropic.subagent // empty')
-                    [[ -n "$haiku"    ]] && export ANTHROPIC_DEFAULT_HAIKU_MODEL="$haiku"
-                    [[ -n "$sonnet"   ]] && export ANTHROPIC_DEFAULT_SONNET_MODEL="$sonnet"
-                    [[ -n "$opus"     ]] && export ANTHROPIC_DEFAULT_OPUS_MODEL="$opus"
-                    [[ -n "$subagent" ]] && export CLAUDE_CODE_SUBAGENT_MODEL="$subagent"
+                    [[ -n "$haiku"    ]] && env_cmd+=("ANTHROPIC_DEFAULT_HAIKU_MODEL=$haiku")
+                    [[ -n "$sonnet"   ]] && env_cmd+=("ANTHROPIC_DEFAULT_SONNET_MODEL=$sonnet")
+                    [[ -n "$opus"     ]] && env_cmd+=("ANTHROPIC_DEFAULT_OPUS_MODEL=$opus")
+                    [[ -n "$subagent" ]] && env_cmd+=("CLAUDE_CODE_SUBAGENT_MODEL=$subagent")
                 fi
             done
         fi
 
         echo "{\"ts\":\"$(date -u +%FT%TZ)\",\"mode\":\"auto\",\"cmd\":\"$1\"}" >> "$TV_USAGE_LOG"
-        "$@"
+        "${env_cmd[@]}" "$@"
     else
         local row
         row=$(echo "$profiles" | jq -c --arg p "$target" '.[$p] // empty')
-        [[ -z "$row" ]] && { _tv_print "  ${_TV_RED}✗ Profile not found: $target${_TV_RST}"; return 1; }
+        [[ -z "$row" ]] && { _tv_run_print "  ${_TV_RED}✗ Profile not found: $target${_TV_RST}"; return 1; }
 
         local auth_mode
         auth_mode=$(echo "$row" | jq -r '.auth_mode // "key"')
@@ -131,9 +140,11 @@ tv-run() {
         if [[ "$auth_mode" == "cli" ]]; then
             "$@"
         else
+            local -a env_cmd
+            env_cmd=(env)
             local k
             k=$(echo "$vault" | jq -r --arg p "$target" '.[$p] // empty')
-            [[ -z "$k" ]] && { _tv_print "  ${_TV_RED}✗ No key stored for: $target${_TV_RST}"; return 1; }
+            [[ -z "$k" ]] && { _tv_run_print "  ${_TV_RED}✗ No key stored for: $target${_TV_RST}"; return 1; }
 
             local bu
             bu=$(echo "$row" | jq -r '.base_url // ""')
@@ -151,15 +162,17 @@ tv-run() {
             env_model=$(echo "$em" | jq -r '.model // empty')
 
             local unset_var="_TV_UNSET_${prov}[@]"
-            for v in "${(P)unset_var}"; do unset "$v"; done
+            for v in "${(P)unset_var}"; do
+                env_cmd+=("-u" "$v")
+            done
 
-            [[ -n "$env_key"   ]] && local -x "${env_key}=$k"
-            [[ -n "$env_token" ]] && local -x "${env_token}=$k"
-            [[ -n "$env_base" && -n "$bu" ]] && local -x "${env_base}=$bu"
+            [[ -n "$env_key"   ]] && env_cmd+=("${env_key}=$k")
+            [[ -n "$env_token" ]] && env_cmd+=("${env_token}=$k")
+            [[ -n "$env_base" && -n "$bu" ]] && env_cmd+=("${env_base}=$bu")
 
             local final_model="$dm"
             [[ -z "$final_model" ]] && final_model=$(echo "$models_cfg" | jq -r --arg pv "$prov" '.[$pv].default // empty')
-            [[ -n "$env_model" && -n "$final_model" ]] && local -x "${env_model}=$final_model"
+            [[ -n "$env_model" && -n "$final_model" ]] && env_cmd+=("${env_model}=$final_model")
 
             if [[ "$prov" == "anthropic" ]]; then
                 local haiku
@@ -170,13 +183,13 @@ tv-run() {
                 opus=$(echo "$models_cfg" | jq -r '.anthropic.opus    // empty')
                 local subagent
                 subagent=$(echo "$models_cfg" | jq -r '.anthropic.subagent // empty')
-                [[ -n "$haiku"    ]] && local -x ANTHROPIC_DEFAULT_HAIKU_MODEL="$haiku"
-                [[ -n "$sonnet"   ]] && local -x ANTHROPIC_DEFAULT_SONNET_MODEL="$sonnet"
-                [[ -n "$opus"     ]] && local -x ANTHROPIC_DEFAULT_OPUS_MODEL="$opus"
-                [[ -n "$subagent" ]] && local -x CLAUDE_CODE_SUBAGENT_MODEL="$subagent"
+                [[ -n "$haiku"    ]] && env_cmd+=("ANTHROPIC_DEFAULT_HAIKU_MODEL=$haiku")
+                [[ -n "$sonnet"   ]] && env_cmd+=("ANTHROPIC_DEFAULT_SONNET_MODEL=$sonnet")
+                [[ -n "$opus"     ]] && env_cmd+=("ANTHROPIC_DEFAULT_OPUS_MODEL=$opus")
+                [[ -n "$subagent" ]] && env_cmd+=("CLAUDE_CODE_SUBAGENT_MODEL=$subagent")
             fi
 
-            "$@"
+            "${env_cmd[@]}" "$@"
         fi
     fi
 }

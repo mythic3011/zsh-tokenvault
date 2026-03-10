@@ -28,11 +28,59 @@ except Exception as exc:
 try:
     import tomllib
 except ModuleNotFoundError:
-    print(json.dumps({"ok": False, "error": "missing_tomllib"}))
-    sys.exit(0)
+    tomllib = None
+
+
+def parse_value(raw_value):
+    value = raw_value.strip()
+    if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
+        return value[1:-1]
+    if value.lower() == "true":
+        return True
+    if value.lower() == "false":
+        return False
+    return value
+
+
+def parse_minimal_toml(raw_text):
+    config = {}
+    current = config
+
+    for raw_line in raw_text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        if "#" in line:
+            line = line.split("#", 1)[0].rstrip()
+            if not line:
+                continue
+
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1].strip()
+            if section.startswith("model_providers."):
+                name = section.split(".", 1)[1]
+                config.setdefault("model_providers", {})
+                config["model_providers"].setdefault(name, {})
+                current = config["model_providers"][name]
+            else:
+                config.setdefault(section, {})
+                current = config[section]
+            continue
+
+        if "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        current[key.strip()] = parse_value(value)
+
+    return config
 
 try:
-    config = tomllib.loads(raw)
+    if tomllib is not None:
+        config = tomllib.loads(raw)
+    else:
+        config = parse_minimal_toml(raw)
 except Exception as exc:
     print(json.dumps({"ok": False, "error": "parse_error", "message": str(exc)}))
     sys.exit(0)
@@ -95,7 +143,7 @@ _tv_menu() {
         _vals+=("$1")
         _descs+=("$2")
         _tv_print "  ${_TV_GRY}${i})${_TV_RST} ${_vals[$i]}  ${_TV_GRY}${_descs[$i]}${_TV_RST}"
-        (( i++ ))
+        (( ++i ))
         shift 2
     done
     printf "\n  Choice [${_def}]: "
@@ -118,7 +166,7 @@ _tv_pick_model() {
         while IFS= read -r m; do
             _tv_print "  ${_TV_GRY}${i})${_TV_RST} $m"
             _mlist+=("$m")
-            (( i++ ))
+            (( ++i ))
         done <<< "$_list"
         _tv_print "  ${_TV_GRY}0)${_TV_RST} Skip"
         printf "\n  Default model [0]: "

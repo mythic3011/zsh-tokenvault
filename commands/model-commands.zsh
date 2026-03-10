@@ -15,6 +15,14 @@ tv-model-set() {
         esac
     done
 
+    if [[ -z "$scope" ]]; then
+        if [[ -n "$p_id" ]]; then
+            scope="profile"
+        elif [[ -n "$prov" || -n "$tier" || -n "$model" ]]; then
+            scope="provider"
+        fi
+    fi
+
     [[ -n "$p_id" ]] && { _tv_validate_id "$p_id" || return 1; }
 
     _tv_banner "Set Default Model"
@@ -66,7 +74,7 @@ tv-model-set() {
                 st=$(jq -r --arg p "$pid" '.[$p].status' "$TV_PROFILES")
                 _tv_print "  ${_TV_GRY}${i})${_TV_RST} $pid  ${_TV_GRY}($st)${_TV_RST}"
                 _pids+=("$pid")
-                (( i++ ))
+                (( ++i ))
             done
             local -a _pids2
             while IFS= read -r pid; do _pids2+=("$pid"); done < <(jq -r 'keys[]' "$TV_PROFILES")
@@ -171,7 +179,7 @@ tv-model-list() {
                 st=$(jq -r --arg p "$pid" '.[$p].status' "$TV_PROFILES")
                 _tv_print "  ${_TV_GRY}${i})${_TV_RST} $pid  ${_TV_GRY}($st)${_TV_RST}"
                 _pids2+=("$pid")
-                (( i++ ))
+                (( ++i ))
             done < <(jq -r 'keys[]' "$TV_PROFILES")
             printf "\n  Choice: "
             read _c
@@ -197,7 +205,7 @@ tv-model-list() {
     local i=1
     while IFS= read -r m; do
         _tv_print "  ${_TV_GRY}${i})${_TV_RST} $m"
-        (( i++ ))
+        (( ++i ))
     done <<< "$model_list"
     echo ""
 }
@@ -340,7 +348,7 @@ tv-codex-sync() {
             _tv_print "  ${_TV_GRN}Overwriting ${profile_id} (force)${_TV_RST}"
         fi
 
-        (( ops++ ))
+        (( ++ops ))
 
         if [[ -n "$default_model" ]]; then
             updated_models=$(echo "$updated_models" | jq --arg prov "$provider_type" --arg model "$default_model" '.[$prov].codex = $model')
