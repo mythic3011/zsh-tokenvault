@@ -7,91 +7,60 @@ _tv_get_profiles() {
     [[ -f "$TV_PROFILES" ]] && jq -r 'keys[]' "$TV_PROFILES" 2>/dev/null || true
 }
 
-# Main completion function
+# Main completion function for zsh
 _tokenvault() {
-    local cur prev words cword
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-    words=("${COMP_WORDS[@]}")
-    cword=$COMP_CWORD
+    local cmd="$1"
+    local cur="${words[CURRENT]}"
+    local prev="${words[CURRENT-1]}"
 
-    local cmd="${words[1]}"
-
-    # Complete command names
-    if [[ $cword -eq 1 ]]; then
-        local cmds=(
-            "tv-unlock:Unlock vault"
-            "tv-lock:Lock vault"
-            "tv-unsafe:Toggle unsafe mode"
-            "tv-add:Add profile"
-            "tv-remove:Remove profile"
-            "tv-list:List profiles"
-            "tv-dash:Dashboard"
-            "tv-run:Run command"
-            "tv-report:Report exhausted key"
-            "tv-model-set:Set default model"
-            "tv-model-list:List models"
-            "tv-codex-sync:Sync Codex config"
-            "tv-help:Show help"
-        )
-        COMPREPLY=($(compgen -W "${cmds[*]%:*}" -- "$cur"))
-        return 0
-    fi
-
-    # Complete flags and arguments per command
     case "$cmd" in
         tv-add)
-            if [[ "$cur" == -* ]]; then
-                COMPREPLY=($(compgen -W "-ID -Prov -Auth -Base -QuotaAPI -Reset -Key -Model" -- "$cur"))
-            fi
-            case "$prev" in
-                -Prov) COMPREPLY=($(compgen -W "anthropic openai gemini custom" -- "$cur")) ;;
-                -Auth) COMPREPLY=($(compgen -W "key cli" -- "$cur")) ;;
-                -Reset) COMPREPLY=($(compgen -W "daily payg" -- "$cur")) ;;
-            esac
+            _arguments \
+                '-ID[Profile ID]:id:' \
+                '-Prov[Provider]:(anthropic openai gemini custom)' \
+                '-Auth[Auth mode]:(key cli)' \
+                '-Base[Base URL]:url:' \
+                '-QuotaAPI[Quota API URL]:url:' \
+                '-Reset[Reset type]:(daily payg)' \
+                '-Key[API Key]:key:' \
+                '-Model[Default model]:model:'
             ;;
         tv-remove|tv-report)
-            if [[ $cword -eq 2 && ! "$cur" =~ ^- ]]; then
-                COMPREPLY=($(compgen -W "$(_tv_get_profiles)" -- "$cur"))
-            fi
+            _arguments \
+                ':profile:($(_tv_get_profiles))'
             ;;
         tv-run)
-            if [[ $cword -eq 2 && ! "$cur" =~ ^- ]]; then
+            if [[ $CURRENT -eq 2 ]]; then
                 local profiles=$(_tv_get_profiles)
-                COMPREPLY=($(compgen -W "auto $profiles" -- "$cur"))
+                _values 'profile or auto' auto $profiles
             fi
             ;;
         tv-model-set)
-            if [[ "$cur" == -* ]]; then
-                COMPREPLY=($(compgen -W "-Prov -Tier -Model -Profile" -- "$cur"))
-            fi
-            case "$prev" in
-                -Prov) COMPREPLY=($(compgen -W "anthropic openai gemini custom" -- "$cur")) ;;
-                -Tier) COMPREPLY=($(compgen -W "haiku sonnet opus subagent default" -- "$cur")) ;;
-                -Profile) COMPREPLY=($(compgen -W "$(_tv_get_profiles)" -- "$cur")) ;;
-            esac
+            _arguments \
+                '-Prov[Provider]:(anthropic openai gemini custom)' \
+                '-Tier[Tier]:(haiku sonnet opus subagent default)' \
+                '-Model[Model]:model:' \
+                '-Profile[Profile]:profile:($(_tv_get_profiles))'
             ;;
         tv-model-list)
-            if [[ "$cur" == -* ]]; then
-                COMPREPLY=($(compgen -W "-Prov -Profile" -- "$cur"))
-            fi
-            case "$prev" in
-                -Prov) COMPREPLY=($(compgen -W "anthropic openai gemini custom" -- "$cur")) ;;
-                -Profile) COMPREPLY=($(compgen -W "$(_tv_get_profiles)" -- "$cur")) ;;
-            esac
+            _arguments \
+                '-Prov[Provider]:(anthropic openai gemini custom)' \
+                '-Profile[Profile]:profile:($(_tv_get_profiles))'
             ;;
         tv-codex-sync)
-            if [[ "$cur" == -* ]]; then
-                COMPREPLY=($(compgen -W "-Config -Force -DryRun -AllowWireApi -Yes -H" -- "$cur"))
-            fi
-            case "$prev" in
-                -Config) COMPREPLY=($(compgen -f -- "$cur")) ;;
-            esac
+            _arguments \
+                '-Config[Config file]:file:_files' \
+                '-Force[Force overwrite]' \
+                '-DryRun[Dry run]' \
+                '-AllowWireApi[Allow wire API]' \
+                '-Yes[Skip confirmation]' \
+                '-H[Show help]'
             ;;
     esac
 }
 
-# Register completion for zsh
-if command -v compdef >/dev/null 2>&1; then
+# Register completion for all tv-* commands
+if (( ${+functions[compdef]} )); then
     compdef _tokenvault tv-unlock tv-lock tv-unsafe tv-add tv-remove tv-list tv-dash tv-run tv-report tv-model-set tv-model-list tv-codex-sync tv-help
 fi
+
