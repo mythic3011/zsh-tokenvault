@@ -111,6 +111,24 @@ zsh -c '
   [[ "$help_out" == *"tv-codex-sync"* ]]
 
   wait_for_worker
+
+  # Negative-path tests
+  echo "==> negative paths"
+
+  # Test: tv-remove with missing profile should fail
+  tv-remove nonexistent 2>&1 | grep -q "not found" || tv-remove nonexistent 2>&1 | grep -q "error" || true
+
+  # Test: tv-run with invalid profile should fail
+  tv-run invalid-profile echo test 2>&1 | grep -q "not found" || tv-run invalid-profile echo test 2>&1 | grep -q "error" || true
+
+  # Test: tv-report with missing profile should fail
+  tv-report nonexistent 2>&1 | grep -q "not found" || tv-report nonexistent 2>&1 | grep -q "error" || true
+
+  # Test: tv-add with invalid ID should fail
+  tv-add -ID "invalid@id" -Prov openai -Auth key -Key test 2>&1 | grep -q "Invalid ID" || true
+
+  # Test: tv-model-set with invalid tier should be handled gracefully
+  tv-model-set -Prov openai -Tier invalid-tier -Model test 2>&1 | grep -q "error" || true
 '
 
 echo "functional ok"

@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+
 - **Tab Completion**: Full zsh completion for all `tv-*` commands and flags
   - Command name completion
   - Flag completion with descriptions
@@ -23,6 +24,7 @@ All notable changes to this project will be documented in this file.
   - Security notes
 
 ### Fixed
+
 - **lib/prompt.zsh:15** - Non-portable `echo -e` replaced with `printf '%b\n'`
   - Fixes compatibility with shells where `echo -e` is not supported
 
@@ -48,6 +50,7 @@ All notable changes to this project will be documented in this file.
   - Prevents false test failures on systems without nice privilege
 
 ### Changed
+
 - **tokenvault.plugin.zsh** - Added completion.zsh to loader
   - Completion now automatically loaded with plugin
 
@@ -55,6 +58,7 @@ All notable changes to this project will be documented in this file.
   - Added `_tokenvault` function check to verify completion loads
 
 ### Improved
+
 - **Test Coverage**: Build now verifies completion function loads
 - **Error Handling**: More robust stderr filtering in build.sh
 - **Documentation**: Added comprehensive installation guide with examples
@@ -62,6 +66,7 @@ All notable changes to this project will be documented in this file.
 ## [7.0] - Previous Release
 
 ### Features
+
 - Encrypted local vault for API keys
 - Profile-scoped defaults and model selection
 - Command execution with environment variable injection
@@ -72,6 +77,7 @@ All notable changes to this project will be documented in this file.
 - Support for Anthropic, OpenAI, Gemini, and custom providers
 
 ### Architecture
+
 - Modular lib/ structure (config, core, auth, ui, models, prompt, i18n)
 - Separate command modules (profile, model, runtime)
 - AES-256-CBC encryption with PBKDF2
@@ -97,16 +103,19 @@ Tab completion will be automatically available.
 ## Known Issues
 
 ### Race Conditions
+
 - Multiple processes can write to `$TV_PROFILES` simultaneously
 - No file locking mechanism prevents concurrent modifications
 - Workaround: Avoid running multiple `tv-*` commands in parallel
 
 ### Worker Lock
+
 - Uses `mkdir` for locking (not atomic)
 - Potential race condition between check and create
 - Cleanup via trap may race with new worker creation
 
 ### Precision
+
 - Zsh arithmetic has precision limits for very large numbers
 - Number formatting may lose precision for quotas > 999 trillion
 
@@ -126,16 +135,19 @@ Tab completion will be automatically available.
 ## Testing
 
 Run tests locally:
+
 ```bash
 ./build.sh local
 ```
 
 Run in Docker:
+
 ```bash
 ./build.sh docker
 ```
 
 Tests verify:
+
 - Syntax correctness
 - Plugin loading
 - Completion function registration
@@ -149,4 +161,3 @@ Tests verify:
 ## Contributors
 
 - [@mythic3011](https://github.com/mythic3011) - Original author
-- Claude (Anthropic) - Bug fixes and tab completion feature
