@@ -40,7 +40,7 @@ run_local() {
   ZSH_CUSTOM="$OH_MY_ZSH_CUSTOM" \
   zsh -c '
     source "$ZSH_CUSTOM/plugins/tokenvault/tokenvault.plugin.zsh"
-    typeset -f tv-help tv-add tv-run tv-model-set tv-model-list tv_render >/dev/null
+    typeset -f tv-help tv-add tv-run tv-model-set tv-model-list tv_render _tokenvault >/dev/null
   '
 
   echo "==> smoke test"
@@ -66,10 +66,11 @@ run_local() {
   ' >"$smoke_stdout" 2>"$smoke_stderr"
 
   if [[ -s "$smoke_stderr" ]]; then
-    local expected_warning="_tv_spawn_worker:3: nice(5) failed: operation not permitted"
-    if [[ "$(wc -l < "$smoke_stderr" | tr -d ' ')" != "1" ]] || \
-       ! grep -Fx "$expected_warning" "$smoke_stderr" >/dev/null; then
-      cat "$smoke_stderr" >&2
+    # Filter out known harmless warnings before failing
+    local filtered
+    filtered=$(grep -v "nice([0-9]*) failed: operation not permitted" "$smoke_stderr" || true)
+    if [[ -n "$filtered" ]]; then
+      echo "$filtered" >&2
       exit 1
     fi
   fi

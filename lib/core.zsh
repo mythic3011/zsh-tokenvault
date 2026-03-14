@@ -12,19 +12,21 @@ _tv_banner() {
 
 _tv_fmt_num() {
     local n=$(echo "${1:-0}" | sed 's/[^0-9]//g'); n=${n:-0}
-    if   (( n > 999999 )); then printf "%.1fM" $(echo "$n / 1000000" | bc -l)
-    elif (( n > 999    )); then printf "%.1fk" $(echo "$n / 1000"    | bc -l)
+    if   (( n > 999999 )); then printf "%.1fM" $(( n * 10 / 10000000 )).$(( (n * 10 / 1000000) % 10 ))
+    elif (( n > 999    )); then printf "%.1fk" $(( n * 10 / 10000 )).$(( (n * 10 / 1000) % 10 ))
     else echo "$n"; fi
 }
 
 _tv_short_key() {
     local key="$1"
     [[ -z "$key" ]] && { printf ''; return 0; }
-    local prefix="${key:0:5}"
-    local suffix="$key"
-    if (( ${#key} > 4 )); then
-        suffix="${key: -4}"
+    local len=${#key}
+    if (( len <= 8 )); then
+        printf '%s' "$key"
+        return 0
     fi
+    local prefix="${key:0:5}"
+    local suffix="${key: -4}"
     printf '%s..%s' "$prefix" "$suffix"
 }
 

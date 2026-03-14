@@ -22,8 +22,7 @@ _tv_tr() {
     local key="$1" default="${2:-$1}"
     local locale="$(_tv_i18n_locale)"
     local map="_TV_I18N_${locale}"
-    local text
-    text=$(eval "printf '%s' \"\${${map}[${key}]:-}\"" 2>/dev/null)
+    local text="${${(P)map}[$key]:-}"
     if [[ -n "$text" ]]; then
         printf '%s' "$text"
     else

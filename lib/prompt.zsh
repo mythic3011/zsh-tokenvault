@@ -12,7 +12,7 @@ _tv_spawn_worker() {
         local GRY="%F{240}" CYA="%F{51}" BLU="%F{39}" WHT="%F{255}"
 
         if [[ -z "$_TV_MASTER_KEY" ]]; then
-            echo "\n🔒 ${GRY}Vault Locked${RST}" > "$TV_PROMPT_CACHE"
+            printf '%b\n' "\n🔒 ${GRY}Vault Locked${RST}" > "$TV_PROMPT_CACHE"
             exit 0
         fi
 
@@ -118,7 +118,7 @@ _tv_spawn_worker() {
             [[ -n "$active_provs" ]] && out+=" ${GRY}[${active_provs% }]${RST}"
         fi
 
-        echo -e "$out" > "$TV_PROMPT_CACHE"
+        printf '%b\n' "$out" > "$TV_PROMPT_CACHE"
     ) &!
 }
 

@@ -69,18 +69,16 @@ tv-model-set() {
             _tv_print "\n  Profiles:"
             local i=1
             local -a _pids
-            jq -r 'keys[]' "$TV_PROFILES" | while IFS= read -r pid; do
+            while IFS= read -r pid; do
                 local st
                 st=$(jq -r --arg p "$pid" '.[$p].status' "$TV_PROFILES")
                 _tv_print "  ${_TV_GRY}${i})${_TV_RST} $pid  ${_TV_GRY}($st)${_TV_RST}"
                 _pids+=("$pid")
                 (( ++i ))
-            done
-            local -a _pids2
-            while IFS= read -r pid; do _pids2+=("$pid"); done < <(jq -r 'keys[]' "$TV_PROFILES")
+            done < <(jq -r 'keys[]' "$TV_PROFILES")
             printf "\n  Choice: "
             read _c
-            p_id="${_pids2[${_c}]}"
+            p_id="${_pids[${_c}]}"
         fi
         [[ -z "$p_id" ]] && { _tv_print "  ${_TV_RED}✗ No profile selected${_TV_RST}"; return 1; }
         local exists

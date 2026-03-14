@@ -128,7 +128,7 @@ _tv_ask() {
         read _val
     fi
     [[ -z "$_val" && -n "$_default" ]] && _val="$_default"
-    eval "${_var}=\$_val"
+    printf -v "$_var" '%s' "$_val"
 }
 
 # _tv_menu <varname> <title> <default_index> item1 desc1 item2 desc2 ...
@@ -149,7 +149,10 @@ _tv_menu() {
     printf "\n  Choice [${_def}]: "
     read _c
     local _idx="${_c:-$_def}"
-    eval "${_var}=\${_vals[${_idx}]:-\${_vals[${_def}]}}"
+    _idx="${_idx//[^0-9]/}"
+    [[ -z "$_idx" ]] && _idx="$_def"
+    local _chosen="${_vals[${_idx}]:-${_vals[${_def}]}}"
+    printf -v "$_var" '%s' "$_chosen"
 }
 
 # _tv_pick_model <varname> <prov> <base_url> <key>
@@ -171,14 +174,16 @@ _tv_pick_model() {
         _tv_print "  ${_TV_GRY}0)${_TV_RST} Skip"
         printf "\n  Default model [0]: "
         read _c
-        if [[ "${_c:-0}" != "0" && -n "${_mlist[${_c}]}" ]]; then
-            eval "${_var}=\${_mlist[${_c}]}"
+        local _cidx="${_c:-0}"
+        _cidx="${_cidx//[^0-9]/}"
+        if [[ "${_cidx:-0}" != "0" && -n "${_mlist[${_cidx}]}" ]]; then
+            printf -v "$_var" '%s' "${_mlist[${_cidx}]}"
         fi
     else
         _tv_print "  ${_TV_YEL}⚠ Could not fetch — enter manually${_TV_RST}"
         printf "  Model ID (blank to skip): "
         read _m
-        [[ -n "$_m" ]] && eval "${_var}=\$_m"
+        [[ -n "$_m" ]] && printf -v "$_var" '%s' "$_m"
     fi
 }
 

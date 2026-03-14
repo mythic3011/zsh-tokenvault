@@ -18,6 +18,7 @@ typeset -g TV_PLUGIN_COMMANDS_DIR="${TV_PLUGIN_COMMANDS_DIR:-$TV_PLUGIN_DIR/comm
 [[ -f "$TV_PLUGIN_LIB_DIR/ui.zsh" ]] && source "$TV_PLUGIN_LIB_DIR/ui.zsh"
 [[ -f "$TV_PLUGIN_LIB_DIR/prompt.zsh" ]] && source "$TV_PLUGIN_LIB_DIR/prompt.zsh"
 [[ -f "$TV_PLUGIN_LIB_DIR/auth.zsh" ]] && source "$TV_PLUGIN_LIB_DIR/auth.zsh"
+[[ -f "$TV_PLUGIN_LIB_DIR/completion.zsh" ]] && source "$TV_PLUGIN_LIB_DIR/completion.zsh"
 for tv_command_file in "$TV_PLUGIN_COMMANDS_DIR"/*.zsh(N); do
     source "$tv_command_file"
 done
