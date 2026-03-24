@@ -1,0 +1,135 @@
+{
+  "anthropic": {
+    "id": "anthropic",
+    "display_name": "Anthropic",
+    "provider_type": "anthropic",
+    "default_base_url": "https://api.anthropic.com",
+    "env_map": {
+      "key": "ANTHROPIC_API_KEY",
+      "token": "ANTHROPIC_AUTH_TOKEN",
+      "base": "ANTHROPIC_BASE_URL",
+      "model": "ANTHROPIC_MODEL"
+    },
+    "model_endpoint": "/v1/models",
+    "auth_strategy": "api_key",
+    "auth_headers": {
+      "x-api-key": "{key}",
+      "anthropic-version": "2023-06-01"
+    },
+    "wire_api": "anthropic_native",
+    "notes": "Anthropic Claude API"
+  },
+  "openai": {
+    "id": "openai",
+    "display_name": "OpenAI",
+    "provider_type": "openai",
+    "default_base_url": "https://api.openai.com",
+    "env_map": {
+      "key": "OPENAI_API_KEY",
+      "token": "",
+      "base": "OPENAI_BASE_URL",
+      "model": "OPENAI_DEFAULT_MODEL"
+    },
+    "model_endpoint": "/v1/models",
+    "auth_strategy": "bearer",
+    "auth_headers": {
+      "Authorization": "Bearer {key}"
+    },
+    "wire_api": "openai_compat",
+    "notes": "OpenAI GPT API"
+  },
+  "gemini": {
+    "id": "gemini",
+    "display_name": "Google Gemini",
+    "provider_type": "gemini",
+    "default_base_url": "https://generativelanguage.googleapis.com",
+    "env_map": {
+      "key": "GEMINI_API_KEY",
+      "token": "",
+      "base": "",
+      "model": "GEMINI_DEFAULT_MODEL"
+    },
+    "model_endpoint": "/v1/models",
+    "auth_strategy": "query_param",
+    "auth_headers": {},
+    "auth_query_params": {
+      "key": "{key}"
+    },
+    "wire_api": "gemini_native",
+    "notes": "Google Gemini API"
+  },
+  "openrouter": {
+    "id": "openrouter",
+    "display_name": "OpenRouter",
+    "provider_type": "openrouter",
+    "default_base_url": "https://openrouter.ai/api",
+    "env_map": {
+      "key": "OPENROUTER_API_KEY",
+      "token": "",
+      "base": "OPENROUTER_BASE_URL",
+      "model": "OPENROUTER_DEFAULT_MODEL"
+    },
+    "model_endpoint": "/v1/models",
+    "auth_strategy": "bearer",
+    "auth_headers": {
+      "Authorization": "Bearer {key}"
+    },
+    "wire_api": "openai_compat",
+    "notes": "OpenRouter multi-provider gateway"
+  },
+  "bedrock": {
+    "id": "bedrock",
+    "display_name": "AWS Bedrock",
+    "provider_type": "bedrock",
+    "default_base_url": "",
+    "env_map": {
+      "key": "AWS_ACCESS_KEY_ID",
+      "token": "AWS_SECRET_ACCESS_KEY",
+      "base": "AWS_BEDROCK_ENDPOINT",
+      "model": "AWS_BEDROCK_MODEL_ID"
+    },
+    "model_endpoint": "",
+    "auth_strategy": "aws_sigv4",
+    "auth_headers": {},
+    "wire_api": "bedrock_native",
+    "notes": "AWS Bedrock managed service"
+  },
+  "azure-openai": {
+    "id": "azure-openai",
+    "display_name": "Azure OpenAI",
+    "provider_type": "azure-openai",
+    "default_base_url": "",
+    "env_map": {
+      "key": "AZURE_OPENAI_API_KEY",
+      "token": "",
+      "base": "AZURE_OPENAI_ENDPOINT",
+      "model": "AZURE_OPENAI_DEPLOYMENT"
+    },
+    "model_endpoint": "/openai/models",
+    "auth_strategy": "api_key",
+    "auth_headers": {
+      "api-key": "{key}"
+    },
+    "wire_api": "openai_compat",
+    "notes": "Azure OpenAI Service"
+  },
+  "custom": {
+    "id": "custom",
+    "display_name": "Custom Provider",
+    "provider_type": "custom",
+    "default_base_url": "",
+    "env_map": {
+      "key": "CUSTOM_API_KEY",
+      "token": "",
+      "base": "CUSTOM_BASE_URL",
+      "model": "CUSTOM_DEFAULT_MODEL"
+    },
+    "model_endpoint": "/v1/models",
+    "auth_strategy": "bearer",
+    "auth_headers": {
+      "Authorization": "Bearer {key}"
+    },
+    "wire_api": "openai_compat",
+    "notes": "Custom OpenAI-compatible provider"
+  }
+}

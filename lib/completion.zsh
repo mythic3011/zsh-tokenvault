@@ -129,6 +129,115 @@ _tokenvault() {
             fi
             return 0
             ;;
+        tv-config-inspect)
+            # Flags: --agent --show-precedence --show-overrides --show-effective --show-graph --show-discovered --json --cwd
+            case "$prev" in
+                --agent)
+                    _tv_complete_agent_ids
+                    return 0
+                    ;;
+                --cwd)
+                    _filedir -d
+                    return 0
+                    ;;
+                --show-precedence|--show-overrides|--show-effective|--show-graph|--show-discovered|--json)
+                    # Boolean flags, no args
+                    return 0
+                    ;;
+            esac
+            # Complete flag names
+            if [[ "$cur" == --* ]]; then
+                COMPREPLY=($(compgen -W "--agent --show-precedence --show-overrides --show-effective --show-graph --show-discovered --json --cwd" -- "$cur"))
+            fi
+            return 0
+            ;;
+        tv-runtime-sync)
+            # Flags: --agent --force --dry-run
+            case "$prev" in
+                --agent)
+                    _tv_complete_agent_ids
+                    return 0
+                    ;;
+                --force|--dry-run)
+                    # Boolean flags, no args
+                    return 0
+                    ;;
+            esac
+            # Complete flag names
+            if [[ "$cur" == --* ]]; then
+                COMPREPLY=($(compgen -W "--agent --force --dry-run" -- "$cur"))
+            fi
+            return 0
+            ;;
+        tv-self-update-cmd)
+            # Args: --check --install --rollback
+            COMPREPLY=($(compgen -W "--check --install --rollback" -- "$cur"))
+            return 0
+            ;;
+        tv-adapter-update)
+            # Flags: --agent --force
+            case "$prev" in
+                --agent)
+                    _tv_complete_agent_ids
+                    return 0
+                    ;;
+                --force)
+                    # Boolean flag, no args
+                    return 0
+                    ;;
+            esac
+            # Complete flag names
+            if [[ "$cur" == --* ]]; then
+                COMPREPLY=($(compgen -W "--agent --force" -- "$cur"))
+            fi
+            return 0
+            ;;
+        tv-version-cmd)
+            # Flags: --json
+            COMPREPLY=($(compgen -W "--json" -- "$cur"))
+            return 0
+            ;;
+        tv-version-check-compat)
+            # Flags: --agent --version
+            case "$prev" in
+                --agent)
+                    _tv_complete_agent_ids
+                    return 0
+                    ;;
+                --version)
+                    # Arbitrary version string
+                    return 0
+                    ;;
+            esac
+            # Complete flag names
+            if [[ "$cur" == --* ]]; then
+                COMPREPLY=($(compgen -W "--agent --version" -- "$cur"))
+            fi
+            return 0
+            ;;
+        tv-key-rotate)
+            # First arg: profile-id
+            if (( cword == 2 )); then
+                _tv_complete_profile_ids
+            fi
+            return 0
+            ;;
+        tv-key-status)
+            # No arguments
+            return 0
+            ;;
+        tv-provider-list)
+            # No arguments
+            return 0
+            ;;
+        tv-agent-list)
+            # No arguments
+            return 0
+            ;;
+        tv-update-registry-cmd)
+            # No arguments
+            return 0
+            ;;
     esac
 
     return 0
@@ -140,6 +249,16 @@ _tv_complete_profile_ids() {
         profiles=$(jq -r 'keys[]' "$TV_PROFILES" 2>/dev/null)
     fi
     COMPREPLY=($(compgen -W "$profiles" -- "$cur"))
+}
+
+_tv_complete_agent_ids() {
+    local agents=""
+    if [[ -f "$TV_AGENT_REGISTRY_FILE" ]]; then
+        agents=$(jq -r 'keys[]' "$TV_AGENT_REGISTRY_FILE" 2>/dev/null)
+    fi
+    # Add common agents
+    agents+=" codex claude-code aider"
+    COMPREPLY=($(compgen -W "$agents" -- "$cur"))
 }
 
 # Register compdef for all tv-* commands (only if compdef is available)
@@ -157,4 +276,16 @@ if typeset -f compdef >/dev/null 2>&1; then
     compdef _tokenvault tv-model-list
     compdef _tokenvault tv-codex-sync
     compdef _tokenvault tv-help
+    compdef _tokenvault tv-config-inspect
+    compdef _tokenvault tv-runtime-sync
+    compdef _tokenvault tv-self-update-cmd
+    compdef _tokenvault tv-adapter-update
+    compdef _tokenvault tv-version-cmd
+    compdef _tokenvault tv-version-check-compat
+    compdef _tokenvault tv-key-rotate
+    compdef _tokenvault tv-key-status
+    compdef _tokenvault tv-add-key
+    compdef _tokenvault tv-provider-list
+    compdef _tokenvault tv-agent-list
+    compdef _tokenvault tv-update-registry-cmd
 fi

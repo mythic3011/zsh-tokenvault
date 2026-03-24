@@ -2,9 +2,17 @@
 [[ -n "${TV_I18N_LOADED:-}" ]] && return 0
 typeset -g TV_I18N_LOADED=1
 
+# --- I18N MODULE ---
+# Loads translations from external JSON files in i18n/ directory
+# Easy to update and extend without modifying core code
+
 typeset -g TV_LANG="${TV_LANG:-${LANG:-en}}"
 TV_LANG="${TV_LANG%%.*}"
 
+typeset -g TV_I18N_DIR="${TV_PLUGIN_DIR:-${TV_PLUGIN_PATH:A:h}}/i18n"
+typeset -gA _TV_I18N_CACHE=()
+
+# Detect locale
 _tv_i18n_locale() {
     local lang="${TV_LANG:-${LANG:-en}}"
     lang="${lang%%.*}"
@@ -18,11 +26,47 @@ _tv_i18n_locale() {
     esac
 }
 
+# Load translations from JSON file
+_tv_i18n_load() {
+    local locale="$1"
+    local cache_key="i18n_${locale}"
+    
+    # Return cached if available
+    [[ -n "${_TV_I18N_CACHE[$cache_key]:-}" ]] && return 0
+    
+    local json_file="${TV_I18N_DIR}/${locale}.json"
+    
+    # Fallback to English if locale file not found
+    if [[ ! -f "$json_file" ]]; then
+        json_file="${TV_I18N_DIR}/en.json"
+    fi
+    
+    # Still not found, use empty
+    if [[ ! -f "$json_file" ]]; then
+        _TV_I18N_CACHE[$cache_key]="{}"
+        return 0
+    fi
+    
+    # Load and cache
+    _TV_I18N_CACHE[$cache_key]=$(cat "$json_file")
+}
+
+# Translate a key
+# Usage: _tv_tr <key> [default]
 _tv_tr() {
     local key="$1" default="${2:-$1}"
     local locale="$(_tv_i18n_locale)"
-    local map="_TV_I18N_${locale}"
-    local text="${${(P)map}[$key]:-}"
+    
+    # Load translations
+    _tv_i18n_load "$locale"
+    
+    local cache_key="i18n_${locale}"
+    local translations="${_TV_I18N_CACHE[$cache_key]:-{}}"
+    
+    # Try to get translation
+    local text
+    text=$(echo "$translations" | jq -r --arg k "$key" '.[$k] // empty' 2>/dev/null)
+    
     if [[ -n "$text" ]]; then
         printf '%s' "$text"
     else
@@ -30,139 +74,35 @@ _tv_tr() {
     fi
 }
 
-typeset -gA _TV_I18N_en=(
-    profile_id_prompt "Profile ID"
-    provider_title "Provider"
-    auth_mode_title "Auth mode"
-    base_url_prompt "Proxy / Base URL (blank = official endpoint)"
-    quota_api_prompt "Quota check API URL"
-    reset_type_title "Reset type"
-    env_vars_header "Env var names (Enter = keep default)"
-    key_env_prompt "Key env"
-    base_env_prompt "Base env"
-    model_env_prompt "Model env"
-    api_key_prompt "API Key"
-    model_fetching "Fetching model list..."
-    models_available "Available models:"
-    skip_option "Skip"
-    default_model_prompt "Default model"
-    add_profile_title "Add Profile"
-    add_key_title "Add Key"
-    help_vault "Vault"
-    help_profiles "Profiles"
-    help_add "Interactive add"
-    help_add_cli "CLI add"
-    help_rotate_key "Add/rotate key for existing profile"
-    help_remove "Remove profile"
-    help_list "List all profiles"
-    help_run "Run command"
-    help_help "Help"
-    update_title "Update TokenVault"
-    update_prompt "Update to version %s?"
-    update_success "Updated to version %s"
-    update_already_latest "Already at version %s"
-    update_error "Update failed: %s"
-    update_cancelled "Update cancelled"
-)
-typeset -gA _TV_I18N_zh_hk=(
-    profile_id_prompt "設定檔 ID"
-    provider_title "提供者"
-    auth_mode_title "驗證方式"
-    base_url_prompt "代理 / 基本網址（空白使用官方）"
-    quota_api_prompt "配額查詢 API URL"
-    reset_type_title "重設類型"
-    env_vars_header "環境變數名稱（Enter 保留預設）"
-    key_env_prompt "Key 環境"
-    base_env_prompt "Base 環境"
-    model_env_prompt "Model 環境"
-    api_key_prompt "API 金鑰"
-    model_fetching "正在擷取模型清單..."
-    models_available "可用模型："
-    skip_option "跳過"
-    default_model_prompt "預設模型"
-    add_profile_title "新增設定檔"
-    add_key_title "新增金鑰"
-    help_vault "金庫"
-    help_profiles "設定檔"
-    help_add "互動式新增"
-    help_add_cli "CLI 新增"
-    help_rotate_key "新增/更新現有設定檔金鑰"
-    help_remove "刪除設定檔"
-    help_list "列出所有設定檔"
-    help_run "執行指令"
-    help_help "說明"
-    update_title "更新 TokenVault"
-    update_prompt "要更新到版本 %s 嗎？"
-    update_success "已更新至版本 %s"
-    update_already_latest "已經是版本 %s"
-    update_error "更新失敗：%s"
-    update_cancelled "已取消更新"
-)
-typeset -gA _TV_I18N_zh_cn=(
-    profile_id_prompt "配置 ID"
-    provider_title "提供者"
-    auth_mode_title "认证方式"
-    base_url_prompt "代理 / 基础 URL（留空使用官方）"
-    quota_api_prompt "配额查询 API URL"
-    reset_type_title "重置类型"
-    env_vars_header "环境变量名（Enter 保留默认）"
-    key_env_prompt "Key 环境"
-    base_env_prompt "Base 环境"
-    model_env_prompt "Model 环境"
-    api_key_prompt "API 密钥"
-    model_fetching "正在获取模型列表..."
-    models_available "可用模型："
-    skip_option "跳过"
-    default_model_prompt "默认模型"
-    add_profile_title "新增配置"
-    add_key_title "新增密钥"
-    help_vault "金库"
-    help_profiles "配置"
-    help_add "交互式添加"
-    help_add_cli "CLI 添加"
-    help_rotate_key "为现有配置添加/更新密钥"
-    help_remove "移除配置"
-    help_list "列出所有配置"
-    help_run "执行命令"
-    help_help "帮助"
-    update_title "更新 TokenVault"
-    update_prompt "要更新到版本 %s 吗？"
-    update_success "已更新到版本 %s"
-    update_already_latest "已经是版本 %s"
-    update_error "更新失败：%s"
-    update_cancelled "已取消更新"
-)
-typeset -gA _TV_I18N_zh_tw=(
-    profile_id_prompt "設定檔 ID"
-    provider_title "提供者"
-    auth_mode_title "驗證方式"
-    base_url_prompt "代理 / 基本網址（留白使用官方）"
-    quota_api_prompt "額度查詢 API URL"
-    reset_type_title "重設類型"
-    env_vars_header "環境變數名稱（Enter 保留預設）"
-    key_env_prompt "Key 環境"
-    base_env_prompt "Base 環境"
-    model_env_prompt "Model 環境"
-    api_key_prompt "API 金鑰"
-    model_fetching "正在擷取模型清單..."
-    models_available "可用模型："
-    skip_option "跳過"
-    default_model_prompt "預設模型"
-    add_profile_title "新增設定檔"
-    add_key_title "新增金鑰"
-    help_vault "金庫"
-    help_profiles "設定檔"
-    help_add "互動式新增"
-    help_add_cli "CLI 新增"
-    help_rotate_key "為現有設定檔新增/更新金鑰"
-    help_remove "移除設定檔"
-    help_list "列出所有設定檔"
-    help_run "執行命令"
-    help_help "說明"
-    update_title "更新 TokenVault"
-    update_prompt "要更新到版本 %s 嗎？"
-    update_success "已更新至版本 %s"
-    update_already_latest "已經是版本 %s"
-    update_error "更新失敗：%s"
-    update_cancelled "已取消更新"
-)
+# Translate with sprintf-style formatting
+# Usage: _tv_trf <key> <args...>
+_tv_trf() {
+    local key="$1"
+    shift
+    local template
+    template=$(_tv_tr "$key")
+    printf "$template" "$@"
+}
+
+# List available locales
+_tv_i18n_list_locales() {
+    [[ ! -d "$TV_I18N_DIR" ]] && return 0
+    find "$TV_I18N_DIR" -name "*.json" -type f 2>/dev/null | \
+        sed 's|.*/||; s|\.json$||' | sort
+}
+
+# Reload translations (useful after updates)
+_tv_i18n_reload() {
+    _TV_I18N_CACHE=()
+}
+
+# --- I18N OPEN/CLOSE ---
+
+tv_i18n_open() {
+    [[ -n "${TV_I18N_OPENED:-}" ]] && return 0
+    TV_I18N_OPENED=1
+}
+
+tv_i18n_close() {
+    TV_I18N_OPENED=""
+}

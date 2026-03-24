@@ -1,0 +1,29 @@
+{
+  "codex": {
+    "display_name": "OpenAI Codex",
+    "config_provider": "codex",
+    "capability_provider": "codex",
+    "version_provider": "codex",
+    "updater": "npm",
+    "health_checker": "codex",
+    "registered_at": "default"
+  },
+  "claude-code": {
+    "display_name": "Claude Code",
+    "config_provider": "claude-code",
+    "capability_provider": "claude-code",
+    "version_provider": "claude-code",
+    "updater": "npm",
+    "health_checker": "claude-code",
+    "registered_at": "default"
+  },
+  "aider": {
+    "display_name": "Aider",
+    "config_provider": "aider",
+    "capability_provider": "aider",
+    "version_provider": "aider",
+    "updater": "pip",
+    "health_checker": "aider",
+    "registered_at": "default"
+  }
+}

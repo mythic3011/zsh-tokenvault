@@ -1,0 +1,27 @@
+{
+  "app_version": "7.0",
+  "schema_version": 1,
+  "adapters": {
+    "codex": {
+      "adapter_version": "1.0.0",
+      "compat": {
+        "min_agent_version": "0.34.0",
+        "max_tested_agent_version": "0.39.x"
+      }
+    },
+    "claude-code": {
+      "adapter_version": "1.0.0",
+      "compat": {
+        "min_agent_version": "1.0.0",
+        "max_tested_agent_version": "1.x"
+      }
+    },
+    "aider": {
+      "adapter_version": "1.0.0",
+      "compat": {
+        "min_agent_version": "0.60.0",
+        "max_tested_agent_version": "0.65.x"
+      }
+    }
+  }
+}
