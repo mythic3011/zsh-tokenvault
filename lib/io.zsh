@@ -9,12 +9,11 @@ typeset -g TV_IO_LOADED=1
 # Usage: _tv_atomic_write <file> <content>
 _tv_atomic_write() {
     local file="$1" content="$2"
-    local dir
-    dir=$(dirname "$file")
+    local dir="${file:h}"
     local tmp
     tmp=$(_tv_mktemp "$dir/.atomic_tmp.XXXXXX") || return 1
-    chmod 600 "$tmp"
-    echo "$content" > "$tmp" && mv -f "$tmp" "$file" || { rm -f "$tmp"; return 1; }
+    /bin/chmod 600 "$tmp"
+    echo "$content" > "$tmp" && /bin/mv -f "$tmp" "$file" || { /bin/rm -f "$tmp"; return 1; }
 }
 
 # Safe file read with default
@@ -22,7 +21,7 @@ _tv_atomic_write() {
 _tv_safe_read_file() {
     local file="$1" default="${2:-}"
     if [[ -f "$file" ]]; then
-        cat "$file"
+        print -r -- "$(<"$file")"
     else
         echo "$default"
     fi
@@ -32,9 +31,11 @@ _tv_safe_read_file() {
 # Usage: _tv_ensure_dir <dir> [mode]
 _tv_ensure_dir() {
     local dir="$1" mode="${2:-700}"
+    local mkdir_bin="${commands[mkdir]:-/bin/mkdir}"
+    local chmod_bin="${commands[chmod]:-/bin/chmod}"
     if [[ ! -d "$dir" ]]; then
-        mkdir -p "$dir"
-        chmod "$mode" "$dir"
+        "$mkdir_bin" -p "$dir" || return 1
+        "$chmod_bin" "$mode" "$dir" || return 1
     fi
 }
 

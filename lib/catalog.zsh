@@ -46,7 +46,7 @@ _tv_provider_default_base_url() {
     local info
     info=$(_tv_provider_info "$provider_id")
     [[ -z "$info" ]] && echo "" && return 0
-    echo "$info" | jq -r '.default_base_url // ""'
+    echo "$info" | _tv_jq -r '.default_base_url // ""'
 }
 
 # Get provider env map
@@ -125,7 +125,7 @@ _tv_catalog_list_providers() {
 # Display provider catalog
 # Usage: _tv_display_provider_catalog
 _tv_display_provider_catalog() {
-    _tv_banner "Provider Catalog"
+    _tv_banner "$(_tv_tr "provider_catalog_title" "Provider Catalog")"
     
     local catalog
     catalog=$(_tv_load_provider_catalog)
@@ -134,7 +134,7 @@ _tv_display_provider_catalog() {
     count=$(echo "$catalog" | jq 'keys | length')
     
     if (( count == 0 )); then
-        _tv_print "  ${_TV_GRY}(no providers in catalog)${_TV_RST}"
+        _tv_print "  ${_TV_GRY}$(_tv_tr "no_providers_in_catalog" "(no providers in catalog)")${_TV_RST}"
         return 0
     fi
     
@@ -159,15 +159,15 @@ _tv_validate_provider_entry() {
     provider_type=$(echo "$entry" | jq -r '.provider_type // empty')
     
     if [[ -z "$id" ]]; then
-        _tv_print "  ${_TV_RED}✗ Missing required field: id${_TV_RST}"
+        _tv_print "  ${_TV_RED}✗ $(_tv_tr "missing_required_field_id" "Missing required field: id")${_TV_RST}"
         return 1
     fi
     if [[ -z "$display_name" ]]; then
-        _tv_print "  ${_TV_RED}✗ Missing required field: display_name${_TV_RST}"
+        _tv_print "  ${_TV_RED}✗ $(_tv_tr "missing_required_field_display_name" "Missing required field: display_name")${_TV_RST}"
         return 1
     fi
     if [[ -z "$provider_type" ]]; then
-        _tv_print "  ${_TV_RED}✗ Missing required field: provider_type${_TV_RST}"
+        _tv_print "  ${_TV_RED}✗ $(_tv_tr "missing_required_field_provider_type" "Missing required field: provider_type")${_TV_RST}"
         return 1
     fi
     
@@ -177,10 +177,10 @@ _tv_validate_provider_entry() {
     local has_key
     has_key=$(echo "$env_map" | jq -r 'has("key")')
     if [[ "$has_key" != "true" ]]; then
-        _tv_print "  ${_TV_YEL}⚠ env_map missing 'key' field${_TV_RST}"
+        _tv_print "  ${_TV_YEL}⚠ $(_tv_tr "env_map_missing_key_field" "env_map missing 'key' field")${_TV_RST}"
     fi
     
-    _tv_print "  ${_TV_GRN}✓ Provider entry valid: ${id}${_TV_RST}"
+    _tv_print "  ${_TV_GRN}✓ $(_tv_trf "provider_entry_valid" "Provider entry valid: %s" "$id")${_TV_RST}"
     return 0
 }
 

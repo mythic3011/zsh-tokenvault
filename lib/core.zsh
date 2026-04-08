@@ -65,11 +65,11 @@ _tv_validate_id() {
 
 _tv_write_json() {
     local file="$1" content="$2"
-    local dir; dir=$(dirname "$file")
+    local dir="${file:h}"
     local tmp
     tmp=$(_tv_mktemp "$dir/.json_tmp.XXXXXX") || return 1
-    chmod 600 "$tmp"
-    echo "$content" > "$tmp" && mv -f "$tmp" "$file" || { rm -f "$tmp"; return 1; }
+    /bin/chmod 600 "$tmp"
+    echo "$content" > "$tmp" && /bin/mv -f "$tmp" "$file" || { /bin/rm -f "$tmp"; return 1; }
 }
 
 _tv_mktemp() {
@@ -78,11 +78,16 @@ _tv_mktemp() {
     old_umask=$(umask)
     umask 077
     local tmp
-    tmp=$(mktemp "$tmpl")
+    tmp=$(/usr/bin/mktemp "$tmpl")
     local rc=$?
     umask "$old_umask"
     (( rc != 0 )) && return $rc
     printf '%s' "$tmp"
+}
+
+_tv_jq() {
+    local jq_bin="${TV_JQ_BIN:-${commands[jq]:-/usr/bin/jq}}"
+    "$jq_bin" "$@"
 }
 
 _tv_init() {

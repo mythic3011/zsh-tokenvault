@@ -18,6 +18,10 @@ typeset -g TV_PLUGIN_COMMANDS_DIR="${TV_PLUGIN_COMMANDS_DIR:-$TV_PLUGIN_DIR/comm
 [[ -f "$TV_PLUGIN_LIB_DIR/security.zsh" ]] && source "$TV_PLUGIN_LIB_DIR/security.zsh"
 [[ -f "$TV_PLUGIN_LIB_DIR/json.zsh" ]] && source "$TV_PLUGIN_LIB_DIR/json.zsh"
 [[ -f "$TV_PLUGIN_LIB_DIR/io.zsh" ]] && source "$TV_PLUGIN_LIB_DIR/io.zsh"
+[[ -f "$TV_PLUGIN_LIB_DIR/runtime-roots.zsh" ]] && source "$TV_PLUGIN_LIB_DIR/runtime-roots.zsh"
+[[ -f "$TV_PLUGIN_LIB_DIR/runtime-manifest.zsh" ]] && source "$TV_PLUGIN_LIB_DIR/runtime-manifest.zsh"
+[[ -f "$TV_PLUGIN_LIB_DIR/runtime-policy.zsh" ]] && source "$TV_PLUGIN_LIB_DIR/runtime-policy.zsh"
+[[ -f "$TV_PLUGIN_LIB_DIR/runtime-preflight.zsh" ]] && source "$TV_PLUGIN_LIB_DIR/runtime-preflight.zsh"
 
 # --- Feature modules ---
 [[ -f "$TV_PLUGIN_LIB_DIR/models.zsh" ]] && source "$TV_PLUGIN_LIB_DIR/models.zsh"
@@ -57,6 +61,18 @@ if typeset -f tv_json_open &>/dev/null; then
 fi
 if typeset -f tv_io_open &>/dev/null; then
     tv_io_open
+fi
+if typeset -f tv_runtime_roots_open &>/dev/null; then
+    tv_runtime_roots_open
+fi
+if typeset -f tv_runtime_manifest_open &>/dev/null; then
+    tv_runtime_manifest_open
+fi
+if typeset -f tv_runtime_policy_open &>/dev/null; then
+    tv_runtime_policy_open
+fi
+if typeset -f tv_runtime_preflight_open &>/dev/null; then
+    tv_runtime_preflight_open
 fi
 if typeset -f tv_ui_open &>/dev/null; then
     tv_ui_open

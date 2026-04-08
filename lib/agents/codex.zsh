@@ -342,6 +342,235 @@ tv_agent_codex_check_update() {
     fi
 }
 
+_tv_codex_runtime_home() {
+    local roots="$1"
+    echo "$roots" | _tv_jq -r '.state_root + "/home"'
+}
+
+_tv_codex_runtime_config_path() {
+    local roots="$1"
+    echo "$roots" | _tv_jq -r '.state_root + "/home/config.toml"'
+}
+
+tv_agent_codex_resolve_roots() {
+    local profile="$1"
+    _tv_runtime_roots "codex" "$profile" 1
+}
+
+tv_agent_codex_detect_profile_state() {
+    local profile="$1" roots="$2" row="$3" policy="$4"
+    local runtime_home
+    runtime_home=$(_tv_codex_runtime_home "$roots")
+    _tv_ensure_dir "$runtime_home" 700 || return 1
+
+    local artifacts='[]'
+    [[ -f "$runtime_home/auth.json" ]] && artifacts=$(echo "$artifacts" | _tv_jq '. + ["oauth-session"]')
+    [[ -f "$runtime_home/config.toml" ]] && artifacts=$(echo "$artifacts" | _tv_jq '. + ["api-config"]')
+
+    _tv_jq -n --argjson artifacts "$artifacts" '{
+        ok: true,
+        details: {
+            observed_profile_artifacts: $artifacts
+        }
+    }'
+}
+
+tv_agent_codex_detect_global_state() {
+    local profile="$1" roots="$2" row="$3" policy="$4"
+    local detected='[]'
+    local global_home="${HOME}/.codex"
+    local runtime_home
+    runtime_home=$(_tv_codex_runtime_home "$roots")
+
+    local -a candidates
+    candidates=(
+        "$global_home/config.toml"
+        "$global_home/auth.json"
+        "$global_home/history.jsonl"
+        "$global_home/logs"
+        "$global_home/caches"
+    )
+
+    local candidate
+    for candidate in "${candidates[@]}"; do
+        if [[ -e "$candidate" ]]; then
+            detected=$(echo "$detected" | _tv_jq --arg path "$candidate" '. + [$path]')
+        fi
+    done
+
+    local current_home="${CODEX_HOME:-}"
+    if [[ -n "$current_home" && "$current_home" != "$runtime_home" ]]; then
+        local -a current_candidates
+        current_candidates=(
+            "$current_home"
+            "$current_home/config.toml"
+            "$current_home/auth.json"
+            "$current_home/history.jsonl"
+            "$current_home/logs"
+            "$current_home/caches"
+        )
+        for candidate in "${current_candidates[@]}"; do
+            if [[ -e "$candidate" ]]; then
+                detected=$(echo "$detected" | _tv_jq --arg path "$candidate" '. + [$path]')
+            fi
+        done
+    fi
+
+    detected=$(echo "$detected" | _tv_jq 'unique')
+
+    _tv_jq -n \
+        --argjson detected "$detected" \
+        --arg env_codex_home "${CODEX_HOME:-}" \
+        --arg runtime_home "$runtime_home" \
+        '{
+            detected_global_artifacts: $detected,
+            details: {
+                env_codex_home: $env_codex_home,
+                runtime_home: $runtime_home
+            }
+        }'
+}
+
+tv_agent_codex_detect_env_conflicts() {
+    local profile="$1" roots="$2" row="$3" policy="$4"
+    local scrublist
+    scrublist=$(echo "$policy" | _tv_jq -c '.env_scrublist // []')
+    local present='[]'
+
+    local var
+    for var in $(echo "$scrublist" | _tv_jq -r '.[]'); do
+        if [[ -n "${(P)var:-}" ]]; then
+            present=$(echo "$present" | _tv_jq --arg key "$var" '. + [$key]')
+        fi
+    done
+
+    _tv_jq -n --argjson present "$present" '{
+        ok: true,
+        details: {
+            present_scrubbable_env: $present
+        }
+    }'
+}
+
+tv_agent_codex_effective_resolution_proof() {
+    local profile="$1" roots="$2" row="$3" policy="$4"
+    local runtime_home
+    runtime_home=$(_tv_codex_runtime_home "$roots")
+    local runtime_config
+    runtime_config=$(_tv_codex_runtime_config_path "$roots")
+    _tv_ensure_dir "$runtime_home" 700 || return 1
+
+    _tv_jq -n \
+        --arg resolved_home_path "$runtime_home" \
+        --arg config_path "$runtime_config" \
+        --arg auth_path "$runtime_home/auth.json" \
+        '{
+            resolved_home_path: $resolved_home_path,
+            resolved_config_paths: [$config_path],
+            resolved_auth_paths: [$auth_path],
+            reachable_global_paths: [],
+            proof_complete: true
+        }'
+}
+
+tv_agent_codex_write_api_config() {
+    local profile="$1" roots="$2" row="$3" policy="$4" api_key="$5"
+    local runtime_home runtime_config provider_name base_url default_model
+    runtime_home=$(_tv_codex_runtime_home "$roots")
+    runtime_config=$(_tv_codex_runtime_config_path "$roots")
+    _tv_ensure_dir "$runtime_home" 700 || return 1
+
+    provider_name="tokenvault"
+    base_url=$(echo "$row" | _tv_jq -r '.base_url // ""')
+    default_model=$(echo "$row" | _tv_jq -r '.default_model // ""')
+    [[ -z "$base_url" || "$base_url" == "null" ]] && base_url=$(_tv_provider_default_base_url "openai")
+
+    local config_lines
+    printf -v config_lines 'model_provider = "%s"\n' "$provider_name"
+    if [[ -n "$default_model" && "$default_model" != "null" ]]; then
+        printf -v config_lines '%smodel = "%s"\n' "$config_lines" "$default_model"
+    fi
+    printf -v config_lines '%s\n[model_providers.%s]\n' "$config_lines" "$provider_name"
+    printf -v config_lines '%sbase_url = "%s"\n' "$config_lines" "$base_url"
+    printf -v config_lines '%srequires_openai_auth = true\n' "$config_lines"
+    if [[ -n "$default_model" && "$default_model" != "null" ]]; then
+        printf -v config_lines '%smodel = "%s"\n' "$config_lines" "$default_model"
+    fi
+
+    _tv_atomic_write "$runtime_config" "$config_lines" || {
+        _tv_jq -n '{ok:false, details:{reason:"failed_to_write_runtime_config"}}'
+        return 0
+    }
+    chmod 600 "$runtime_config" 2>/dev/null || true
+
+    _tv_jq -n \
+        --arg runtime_home "$runtime_home" \
+        --arg runtime_config "$runtime_config" \
+        --arg api_key "$api_key" \
+        '{
+            ok: true,
+            runtime_home: $runtime_home,
+            runtime_config: $runtime_config,
+            env: {
+                OPENAI_API_KEY: $api_key
+            }
+        }'
+}
+
+tv_agent_codex_prepare_oauth_runtime() {
+    local profile="$1" roots="$2" row="$3" policy="$4"
+    local runtime_home
+    runtime_home=$(_tv_codex_runtime_home "$roots")
+    _tv_ensure_dir "$runtime_home" 700 || return 1
+
+    jq -n --arg runtime_home "$runtime_home" '{
+        ok: true,
+        runtime_home: $runtime_home
+    }'
+}
+
+tv_agent_codex_check_mode_invariants() {
+    local profile="$1" roots="$2" row="$3" policy="$4"
+    local runtime_home
+    runtime_home=$(_tv_codex_runtime_home "$roots")
+    local launch_mode
+    launch_mode=$(echo "$policy" | _tv_jq -r '.launch_mode // "api"')
+
+    local has_config="false"
+    local has_auth="false"
+    [[ -f "$runtime_home/config.toml" ]] && has_config="true"
+    [[ -f "$runtime_home/auth.json" ]] && has_auth="true"
+
+    if [[ "$launch_mode" == "oauth" && "$has_config" == "true" ]]; then
+        _tv_jq -n '{
+            ok: false,
+            details: {
+                reason: "oauth_profile_has_api_config"
+            }
+        }'
+        return 0
+    fi
+
+    if [[ "$launch_mode" == "api" && "$has_auth" == "true" ]]; then
+        _tv_jq -n '{
+            ok: false,
+            details: {
+                reason: "api_profile_has_oauth_session"
+            }
+        }'
+        return 0
+    fi
+
+    _tv_jq -n --arg launch_mode "$launch_mode" --argjson has_config "$has_config" --argjson has_auth "$has_auth" '{
+        ok: true,
+        details: {
+            launch_mode: $launch_mode,
+            has_config: $has_config,
+            has_auth: $has_auth
+        }
+    }'
+}
+
 # --- CODEX OPEN/CLOSE ---
 
 tv_agent_codex_open() {

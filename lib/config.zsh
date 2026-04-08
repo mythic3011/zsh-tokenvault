@@ -4,6 +4,7 @@ typeset -g TV_CONFIG_LOADED=1
 
 # --- PATHS ---
 typeset -g TV_DIR="${TV_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/tokenvault}"
+typeset -g TV_STATE_DIR="${TV_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/tokenvault}"
 typeset -g TV_CACHE_DIR="${TV_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/tokenvault}"
 typeset -g TV_VAULT="${TV_VAULT:-$TV_DIR/vault.enc}"
 typeset -g TV_PROFILES="${TV_PROFILES:-$TV_DIR/profiles.json}"

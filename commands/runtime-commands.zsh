@@ -5,11 +5,19 @@ typeset -g TV_RUNTIME_COMMANDS_LOADED=1
 tv-run() {
     emulate -L zsh
     setopt localoptions noxtrace noverbose typesetsilent
+    path=(${(s/:/)PATH})
 
     _tv_run_print() { print -P -- "$1" >&2; }
+    _tv_runtime_log_event() {
+        local file="$1" content="$2"
+        local dir
+        dir=$(dirname "$file")
+        _tv_ensure_dir "$dir" 700 || return 1
+        print -r -- "$content" >> "$file"
+    }
 
-    [[ $# -lt 2 ]] && { _tv_run_print "  ${_TV_GRY}Usage: tv-run <id|auto> <cmd...>${_TV_RST}"; return 1; }
-    [[ -z "$_TV_MASTER_KEY" ]] && { _tv_run_print "  ${_TV_RED}✗ Run tv-unlock first${_TV_RST}"; return 1; }
+    [[ $# -lt 2 ]] && { _tv_run_print "  ${_TV_GRY}$(_tv_tr "tv_run_usage" "Usage: tv-run <id|auto> <cmd...>")${_TV_RST}"; return 1; }
+    [[ -z "$_TV_MASTER_KEY" ]] && { _tv_run_print "  ${_TV_RED}✗ $(_tv_tr "run_tv_unlock_first" "Run tv-unlock first")${_TV_RST}"; return 1; }
 
     local target="$1"
     shift
@@ -68,7 +76,7 @@ tv-run() {
         done
 
         if (( n_buckets == 0 )); then
-            _tv_run_print "  ${_TV_YEL}⚠ No active custom keys — using system session${_TV_RST}"
+            _tv_run_print "  ${_TV_YEL}⚠ $(_tv_tr "no_active_custom_keys" "No active custom keys — using system session")${_TV_RST}"
         else
             for prov in $(echo "$buckets" | jq -r 'keys[]'); do
                 local winner
@@ -128,12 +136,71 @@ tv-run() {
     else
         local row
         row=$(echo "$profiles" | jq -c --arg p "$target" '.[$p] // empty')
-        [[ -z "$row" ]] && { _tv_run_print "  ${_TV_RED}✗ Profile not found: $target${_TV_RST}"; return 1; }
+        [[ -z "$row" ]] && { _tv_run_print "  ${_TV_RED}✗ $(_tv_trf "profile_not_found" "Profile not found: %s" "$target")${_TV_RST}"; return 1; }
 
         local auth_mode
         auth_mode=$(echo "$row" | jq -r '.auth_mode // "key"')
         local prov
         prov=$(echo "$row" | jq -r '.provider')
+        local command_name="${1:t}"
+
+        if [[ "$command_name" == "codex" && ( "$auth_mode" == "cli" || "$auth_mode" == "key" ) ]]; then
+            _tv_runtime_bootstrap_from_profile "codex" "$target" "$row" || {
+                _tv_run_print "  ${_TV_RED}✗ $(_tv_trf "runtime_bootstrap_failed" "Failed to materialize runtime policy for profile: %s" "$target")${_TV_RST}"
+                return 1
+            }
+
+            local preflight
+            preflight=$(_tv_runtime_preflight "codex" "$target" "$row")
+            if [[ "$(echo "$preflight" | jq -r '.ok // "false"')" != "true" ]]; then
+                local fail_code
+                fail_code=$(echo "$preflight" | jq -r '.code // "unknown"')
+                _tv_run_print "  ${_TV_RED}✗ $(_tv_tr "runtime_preflight_failed" "Runtime preflight failed")${_TV_RST}"
+                _tv_run_print "  ${_TV_GRY}$(_tv_trf "runtime_preflight_code" "Code: %s" "$fail_code")${_TV_RST}"
+                return 1
+            fi
+
+            local roots policy
+            roots=$(echo "$preflight" | jq -c '.roots')
+            policy=$(echo "$preflight" | jq -c '.policy')
+            local runtime_home log_root
+            log_root=$(echo "$roots" | jq -r '.log_root')
+
+            local -a env_cmd
+            env_cmd=(env)
+            local scrub_var
+            for scrub_var in $(echo "$policy" | jq -r '.env_scrublist[]?'); do
+                env_cmd+=("-u" "$scrub_var")
+            done
+            if [[ "$auth_mode" == "cli" ]]; then
+                local prepared
+                prepared=$(_tv_agent_prepare_oauth_runtime "codex" "$target" "$roots" "$row" "$policy")
+                if [[ "$(echo "$prepared" | jq -r '.ok // "false"')" != "true" ]]; then
+                    _tv_run_print "  ${_TV_RED}✗ $(_tv_trf "runtime_prepare_failed" "Failed to prepare runtime for profile: %s" "$target")${_TV_RST}"
+                    return 1
+                fi
+                runtime_home=$(echo "$prepared" | jq -r '.runtime_home // empty')
+            else
+                local k
+                k=$(echo "$vault" | jq -r --arg p "$target" '.[$p] // empty')
+                [[ -z "$k" ]] && { _tv_run_print "  ${_TV_RED}✗ $(_tv_trf "no_key_stored" "No key stored for: %s" "$target")${_TV_RST}"; return 1; }
+
+                local written
+                written=$(_tv_agent_write_api_config "codex" "$target" "$roots" "$row" "$policy" "$k")
+                if [[ "$(echo "$written" | jq -r '.ok // "false"')" != "true" ]]; then
+                    _tv_run_print "  ${_TV_RED}✗ $(_tv_trf "runtime_prepare_failed" "Failed to prepare runtime for profile: %s" "$target")${_TV_RST}"
+                    return 1
+                fi
+                runtime_home=$(echo "$written" | jq -r '.runtime_home // empty')
+                env_cmd+=("OPENAI_API_KEY=$k")
+            fi
+
+            env_cmd+=("CODEX_HOME=$runtime_home")
+
+            _tv_runtime_log_event "${log_root}/usage.jsonl" "$(jq -nc --arg ts "$(date -u +%FT%TZ)" --arg profile "$target" --arg agent "codex" --arg mode "$(echo "$policy" | jq -r '.launch_mode // "unknown"')" --arg cmd "$command_name" '{ts:$ts, profile:$profile, agent:$agent, mode:$mode, cmd:$cmd}')" >/dev/null 2>&1
+            "${env_cmd[@]}" "$@"
+            return $?
+        fi
 
         echo "{\"ts\":\"$(date -u +%FT%TZ)\",\"profile\":\"$target\",\"provider\":\"$prov\",\"cmd\":\"$1\"}" >> "$TV_USAGE_LOG"
 
@@ -144,7 +211,7 @@ tv-run() {
             env_cmd=(env)
             local k
             k=$(echo "$vault" | jq -r --arg p "$target" '.[$p] // empty')
-            [[ -z "$k" ]] && { _tv_run_print "  ${_TV_RED}✗ No key stored for: $target${_TV_RST}"; return 1; }
+            [[ -z "$k" ]] && { _tv_run_print "  ${_TV_RED}✗ $(_tv_trf "no_key_stored" "No key stored for: %s" "$target")${_TV_RST}"; return 1; }
 
             local bu
             bu=$(echo "$row" | jq -r '.base_url // ""')
@@ -195,7 +262,7 @@ tv-run() {
 }
 
 tv-dash() {
-    _tv_banner "Dashboard"
+    _tv_banner "$(_tv_tr "dashboard_title" "Dashboard")"
     _tv_print "$(printf "  %-14s %-12s %-6s %-8s %-10s %-10s %s" \
         "PROFILE" "PROVIDER" "AUTH" "RESET" "STATUS" "REMAIN" "MODEL")"
     _tv_print "  ${_TV_GRY}$(printf '%.0s─' {1..72})${_TV_RST}"
@@ -223,7 +290,7 @@ tv-dash() {
     done
     echo ""
 
-    _tv_print "  ${_TV_GRY}Pool totals:${_TV_RST}"
+    _tv_print "  ${_TV_GRY}$(_tv_tr "pool_totals" "Pool totals:")${_TV_RST}"
     jq -r '
         to_entries
         | group_by(.value.provider)[]

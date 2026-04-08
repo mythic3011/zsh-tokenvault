@@ -13,6 +13,14 @@ typeset -g TV_AGENT_PROVIDER_LOADED=1
 #   tv_agent_<id>_normalize_models <raw_models> <context>
 #   tv_agent_<id>_detect_version <context>
 #   tv_agent_<id>_check_update <context>
+#   tv_agent_<id>_resolve_roots <profile>
+#   tv_agent_<id>_detect_profile_state <profile> <roots> <row> <policy>
+#   tv_agent_<id>_detect_global_state <profile> <roots> <row> <policy>
+#   tv_agent_<id>_detect_env_conflicts <profile> <roots> <row> <policy>
+#   tv_agent_<id>_effective_resolution_proof <profile> <roots> <row> <policy>
+#   tv_agent_<id>_write_api_config <profile> <roots> <row> <policy> <api_key>
+#   tv_agent_<id>_prepare_oauth_runtime <profile> <roots> <row> <policy>
+#   tv_agent_<id>_check_mode_invariants <profile> <roots> <row> <policy>
 
 # --- AGENT PROVIDER BASE ---
 
@@ -251,6 +259,94 @@ _tv_agent_check_update() {
         latest_version: "unknown",
         channel: "stable"
     }'
+}
+
+_tv_agent_resolve_roots() {
+    local agent_id="$1" profile="$2"
+
+    if typeset -f "tv_agent_${agent_id}_resolve_roots" >/dev/null 2>&1; then
+        "tv_agent_${agent_id}_resolve_roots" "$profile"
+        return $?
+    fi
+
+    _tv_runtime_roots "$agent_id" "$profile" 1
+}
+
+_tv_agent_detect_profile_state() {
+    local agent_id="$1" profile="$2" roots="$3" row="$4" policy="$5"
+
+    if typeset -f "tv_agent_${agent_id}_detect_profile_state" >/dev/null 2>&1; then
+        "tv_agent_${agent_id}_detect_profile_state" "$profile" "$roots" "$row" "$policy"
+        return $?
+    fi
+
+    jq -n '{ok:false, details:{reason:"runtime_profile_state_not_supported"}}'
+}
+
+_tv_agent_detect_global_state() {
+    local agent_id="$1" profile="$2" roots="$3" row="$4" policy="$5"
+
+    if typeset -f "tv_agent_${agent_id}_detect_global_state" >/dev/null 2>&1; then
+        "tv_agent_${agent_id}_detect_global_state" "$profile" "$roots" "$row" "$policy"
+        return $?
+    fi
+
+    jq -n '{detected_global_artifacts:[], details:{}}'
+}
+
+_tv_agent_detect_env_conflicts() {
+    local agent_id="$1" profile="$2" roots="$3" row="$4" policy="$5"
+
+    if typeset -f "tv_agent_${agent_id}_detect_env_conflicts" >/dev/null 2>&1; then
+        "tv_agent_${agent_id}_detect_env_conflicts" "$profile" "$roots" "$row" "$policy"
+        return $?
+    fi
+
+    jq -n '{ok:false, details:{reason:"runtime_env_conflict_check_not_supported"}}'
+}
+
+_tv_agent_effective_resolution_proof() {
+    local agent_id="$1" profile="$2" roots="$3" row="$4" policy="$5"
+
+    if typeset -f "tv_agent_${agent_id}_effective_resolution_proof" >/dev/null 2>&1; then
+        "tv_agent_${agent_id}_effective_resolution_proof" "$profile" "$roots" "$row" "$policy"
+        return $?
+    fi
+
+    jq -n '{proof_complete:false, reason:"runtime_resolution_proof_not_supported"}'
+}
+
+_tv_agent_write_api_config() {
+    local agent_id="$1" profile="$2" roots="$3" row="$4" policy="$5" api_key="$6"
+
+    if typeset -f "tv_agent_${agent_id}_write_api_config" >/dev/null 2>&1; then
+        "tv_agent_${agent_id}_write_api_config" "$profile" "$roots" "$row" "$policy" "$api_key"
+        return $?
+    fi
+
+    jq -n '{ok:false, details:{reason:"runtime_api_config_write_not_supported"}}'
+}
+
+_tv_agent_prepare_oauth_runtime() {
+    local agent_id="$1" profile="$2" roots="$3" row="$4" policy="$5"
+
+    if typeset -f "tv_agent_${agent_id}_prepare_oauth_runtime" >/dev/null 2>&1; then
+        "tv_agent_${agent_id}_prepare_oauth_runtime" "$profile" "$roots" "$row" "$policy"
+        return $?
+    fi
+
+    jq -n '{ok:false, details:{reason:"runtime_oauth_prepare_not_supported"}}'
+}
+
+_tv_agent_check_mode_invariants() {
+    local agent_id="$1" profile="$2" roots="$3" row="$4" policy="$5"
+
+    if typeset -f "tv_agent_${agent_id}_check_mode_invariants" >/dev/null 2>&1; then
+        "tv_agent_${agent_id}_check_mode_invariants" "$profile" "$roots" "$row" "$policy"
+        return $?
+    fi
+
+    jq -n '{ok:false, details:{reason:"runtime_mode_invariants_not_supported"}}'
 }
 
 # --- AGENT PROVIDER OPEN/CLOSE ---
