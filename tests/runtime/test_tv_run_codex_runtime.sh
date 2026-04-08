@@ -93,4 +93,19 @@ api_usage="$TV_STATE_DIR/logs/codex/api-demo/usage.jsonl"
 [[ -f "$oauth_usage" ]]
 [[ -f "$api_usage" ]]
 
+api_row=$(jq -c '."api-demo"' "$TV_PROFILES")
+oauth_row=$(jq -c '."oauth-demo"' "$TV_PROFILES")
+
+print -r -- '{}' > "$HOME/.codex/auth.json"
+api_preflight="$(_tv_runtime_preflight "codex" "api-demo" "$api_row")"
+[[ "$(echo "$api_preflight" | jq -r '.ok')" == "false" ]]
+[[ "$(echo "$api_preflight" | jq -r '.code')" == "E_GLOBAL_SHADOW_CONFLICT" ]]
+rm -f "$HOME/.codex/auth.json"
+
+print -r -- 'model_provider = "global"' > "$HOME/.codex/config.toml"
+oauth_preflight="$(_tv_runtime_preflight "codex" "oauth-demo" "$oauth_row")"
+[[ "$(echo "$oauth_preflight" | jq -r '.ok')" == "false" ]]
+[[ "$(echo "$oauth_preflight" | jq -r '.code')" == "E_GLOBAL_SHADOW_CONFLICT" ]]
+rm -f "$HOME/.codex/config.toml"
+
 echo "smoke-ok"

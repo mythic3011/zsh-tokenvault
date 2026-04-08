@@ -352,6 +352,113 @@ _tv_codex_runtime_config_path() {
     echo "$roots" | _tv_jq -r '.state_root + "/home/config.toml"'
 }
 
+_tv_codex_global_candidates_json() {
+    local global_home="$1" current_home="$2"
+    local runtime_home="$3"
+    local candidates='[]'
+
+    local -a global_candidates
+    global_candidates=(
+        "$global_home/config.toml:api-config"
+        "$global_home/auth.json:oauth-session"
+        "$global_home/history.jsonl:history"
+        "$global_home/logs:logs"
+        "$global_home/caches:caches"
+    )
+
+    local entry path artifact_class
+    for entry in "${global_candidates[@]}"; do
+        path="${entry%%:*}"
+        artifact_class="${entry#*:}"
+        if [[ -e "$path" ]]; then
+            candidates=$(echo "$candidates" | _tv_jq \
+                --arg path "$path" \
+                --arg artifact_class "$artifact_class" \
+                '. + [{path:$path, class:$artifact_class, source:"default_home"}]')
+        fi
+    done
+
+    if [[ -n "$current_home" && "$current_home" != "$runtime_home" ]]; then
+        local -a current_candidates
+        current_candidates=(
+            "$current_home:home-override"
+            "$current_home/config.toml:api-config"
+            "$current_home/auth.json:oauth-session"
+            "$current_home/history.jsonl:history"
+            "$current_home/logs:logs"
+            "$current_home/caches:caches"
+        )
+        for entry in "${current_candidates[@]}"; do
+            path="${entry%%:*}"
+            artifact_class="${entry#*:}"
+            if [[ -e "$path" ]]; then
+                candidates=$(echo "$candidates" | _tv_jq \
+                    --arg path "$path" \
+                    --arg artifact_class "$artifact_class" \
+                    '. + [{path:$path, class:$artifact_class, source:"env_home"}]')
+            fi
+        done
+    fi
+
+    echo "$candidates" | _tv_jq 'unique_by(.path + ":" + .class + ":" + .source)'
+}
+
+_tv_codex_detect_keychain_auth_surfaces() {
+    local services_csv="${TV_CODEX_KEYCHAIN_SERVICES:-codex,com.openai.codex,OpenAI Codex}"
+
+    if [[ "$OSTYPE" != darwin* ]] || ! command -v security >/dev/null 2>&1; then
+        _tv_jq -n '{
+            available: false,
+            detection_scope: "unsupported",
+            checked_services: [],
+            detected_surfaces: []
+        }'
+        return 0
+    fi
+
+    local checked='[]'
+    local detected='[]'
+    local service
+    for service in ${(s:,:)services_csv}; do
+        [[ -z "$service" ]] && continue
+        checked=$(echo "$checked" | _tv_jq --arg service "$service" '. + [$service]')
+        if /usr/bin/security find-generic-password -s "$service" >/dev/null 2>&1 \
+            || /usr/bin/security find-internet-password -s "$service" >/dev/null 2>&1; then
+            detected=$(echo "$detected" | _tv_jq --arg service "$service" '. + [{service:$service, class:"oauth-session", source:"macos_keychain"}]')
+        fi
+    done
+
+    _tv_jq -n \
+        --argjson checked "$checked" \
+        --argjson detected "$detected" \
+        '{
+            available: true,
+            detection_scope: "macos_service_probe",
+            checked_services: $checked,
+            detected_surfaces: $detected
+        }'
+}
+
+_tv_codex_classify_global_conflicts() {
+    local launch_mode="$1" artifact_evidence="$2" auth_surfaces="$3"
+    local conflicts='[]'
+
+    local artifact_conflicts='[]'
+    if [[ "$launch_mode" == "oauth" ]]; then
+        artifact_conflicts=$(echo "$artifact_evidence" | _tv_jq '[.[] | select(.class == "api-config")]')
+    elif [[ "$launch_mode" == "api" ]]; then
+        artifact_conflicts=$(echo "$artifact_evidence" | _tv_jq '[.[] | select(.class == "oauth-session")]')
+    fi
+
+    conflicts=$(echo "$conflicts" | _tv_jq --argjson more "$artifact_conflicts" '. + $more')
+
+    if [[ "$launch_mode" == "api" ]]; then
+        conflicts=$(echo "$conflicts" | _tv_jq --argjson more "$auth_surfaces" '. + $more')
+    fi
+
+    echo "$conflicts" | _tv_jq 'unique'
+}
+
 tv_agent_codex_resolve_roots() {
     local profile="$1"
     _tv_runtime_roots "codex" "$profile" 1
@@ -377,56 +484,46 @@ tv_agent_codex_detect_profile_state() {
 
 tv_agent_codex_detect_global_state() {
     local profile="$1" roots="$2" row="$3" policy="$4"
-    local detected='[]'
     local global_home="${HOME}/.codex"
     local runtime_home
     runtime_home=$(_tv_codex_runtime_home "$roots")
-
-    local -a candidates
-    candidates=(
-        "$global_home/config.toml"
-        "$global_home/auth.json"
-        "$global_home/history.jsonl"
-        "$global_home/logs"
-        "$global_home/caches"
-    )
-
-    local candidate
-    for candidate in "${candidates[@]}"; do
-        if [[ -e "$candidate" ]]; then
-            detected=$(echo "$detected" | _tv_jq --arg path "$candidate" '. + [$path]')
-        fi
-    done
-
     local current_home="${CODEX_HOME:-}"
-    if [[ -n "$current_home" && "$current_home" != "$runtime_home" ]]; then
-        local -a current_candidates
-        current_candidates=(
-            "$current_home"
-            "$current_home/config.toml"
-            "$current_home/auth.json"
-            "$current_home/history.jsonl"
-            "$current_home/logs"
-            "$current_home/caches"
-        )
-        for candidate in "${current_candidates[@]}"; do
-            if [[ -e "$candidate" ]]; then
-                detected=$(echo "$detected" | _tv_jq --arg path "$candidate" '. + [$path]')
-            fi
-        done
-    fi
+    local launch_mode
+    launch_mode=$(echo "$policy" | _tv_jq -r '.launch_mode // "api"')
 
-    detected=$(echo "$detected" | _tv_jq 'unique')
+    local artifact_evidence
+    artifact_evidence=$(_tv_codex_global_candidates_json "$global_home" "$current_home" "$runtime_home")
+
+    local keychain_state
+    keychain_state=$(_tv_codex_detect_keychain_auth_surfaces)
+    local keychain_detected
+    keychain_detected=$(echo "$keychain_state" | _tv_jq -c '.detected_surfaces // []')
+
+    local conflicts
+    conflicts=$(_tv_codex_classify_global_conflicts "$launch_mode" "$artifact_evidence" "$keychain_detected")
 
     _tv_jq -n \
-        --argjson detected "$detected" \
+        --argjson artifacts "$artifact_evidence" \
+        --argjson keychain "$keychain_detected" \
+        --argjson conflicts "$conflicts" \
         --arg env_codex_home "${CODEX_HOME:-}" \
         --arg runtime_home "$runtime_home" \
+        --arg launch_mode "$launch_mode" \
+        --arg detection_scope "$(echo "$keychain_state" | _tv_jq -r '.detection_scope // "unknown"')" \
+        --argjson keychain_available "$(echo "$keychain_state" | _tv_jq '.available // false')" \
+        --argjson checked_services "$(echo "$keychain_state" | _tv_jq '.checked_services // []')" \
         '{
-            detected_global_artifacts: $detected,
+            detected_global_artifacts: ($artifacts | map(.path)),
+            classified_global_artifacts: $artifacts,
+            detected_global_auth_surfaces: $keychain,
+            conflicting_global_artifacts: $conflicts,
             details: {
+                launch_mode: $launch_mode,
                 env_codex_home: $env_codex_home,
-                runtime_home: $runtime_home
+                runtime_home: $runtime_home,
+                keychain_detection_available: $keychain_available,
+                keychain_detection_scope: $detection_scope,
+                keychain_checked_services: $checked_services
             }
         }'
 }

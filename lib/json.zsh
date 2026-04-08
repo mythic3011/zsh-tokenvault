@@ -8,11 +8,15 @@ typeset -g TV_JSON_LOADED=1
 # Safe jq wrapper with error handling
 _tv_jq() {
     local jq_bin="${TV_JQ_BIN:-${commands[jq]:-/usr/bin/jq}}"
-    if (( $# == 1 )) && [[ "$1" != -* ]]; then
+    local first_arg="${1:-}"
+    local first_is_non_option=0
+    [[ -n "$first_arg" && "${first_arg#-}" == "$first_arg" ]] && first_is_non_option=1
+
+    if (( $# == 1 && first_is_non_option )); then
         "$jq_bin" "$1" 2>/dev/null
         return $?
     fi
-    if (( $# > 1 )) && [[ "$1" != -* ]]; then
+    if (( $# > 1 && first_is_non_option )); then
         local input="$1"
         shift
         print -r -- "$input" | "$jq_bin" "$@" 2>/dev/null

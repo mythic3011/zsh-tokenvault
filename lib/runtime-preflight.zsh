@@ -20,8 +20,8 @@ _tv_runtime_preflight_emit_reject() {
         --arg agent "$agent" \
         --arg profile "$profile" \
         --arg stage "$stage" \
-        --argjson details "$details" \
-        '{event:$event, code:$code, agent:$agent, profile:$profile, stage:$stage, details:$details}')" >> "${log_root}/audit.jsonl"
+        --arg details_json "$details" \
+        '{event:$event, code:$code, agent:$agent, profile:$profile, stage:$stage, details: (try ($details_json | fromjson) catch {raw:$details_json})}')" >> "${log_root}/audit.jsonl"
 }
 
 _tv_runtime_preflight_fail() {
@@ -30,12 +30,12 @@ _tv_runtime_preflight_fail() {
     _tv_jq -n \
         --arg code "$code" \
         --arg stage "$stage" \
-        --argjson details "$details" \
+        --arg details_json "$details" \
         '{
             ok: false,
             code: $code,
             stage: $stage,
-            details: $details
+            details: (try ($details_json | fromjson) catch {raw:$details_json})
         }'
 }
 
@@ -123,10 +123,11 @@ _tv_runtime_preflight() {
         return 0
     fi
 
-    local shadow_policy reachable_count detected_count
+    local shadow_policy reachable_count detected_count conflict_count
     shadow_policy=$(echo "$policy" | _tv_jq -r '.global_shadow_policy // "forbid-conflict"')
     reachable_count=$(echo "$proof" | _tv_jq '(.reachable_global_paths // []) | length')
-    detected_count=$(echo "$global_state" | _tv_jq '(.detected_global_artifacts // []) | length')
+    detected_count=$(echo "$global_state" | _tv_jq '((.classified_global_artifacts // []) | length) + ((.detected_global_auth_surfaces // []) | length)')
+    conflict_count=$(echo "$global_state" | _tv_jq '(.conflicting_global_artifacts // []) | length')
 
     case "$shadow_policy" in
         forbid-exists)
@@ -136,8 +137,8 @@ _tv_runtime_preflight() {
             fi
             ;;
         forbid-conflict|shadow-ignore)
-            if (( reachable_count > 0 )); then
-                _tv_runtime_preflight_fail "$agent" "$profile" "$roots" "E_GLOBAL_SHADOW_CONFLICT" "evaluate shadow policy and conflict policy" "$(echo "$proof" | _tv_jq -c '.')"
+            if (( reachable_count > 0 || conflict_count > 0 )); then
+                _tv_runtime_preflight_fail "$agent" "$profile" "$roots" "E_GLOBAL_SHADOW_CONFLICT" "evaluate shadow policy and conflict policy" "$(echo "$global_state" | _tv_jq -c '.')"
                 return 0
             fi
             ;;
