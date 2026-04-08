@@ -108,4 +108,10 @@ oauth_preflight="$(_tv_runtime_preflight "codex" "oauth-demo" "$oauth_row")"
 [[ "$(echo "$oauth_preflight" | jq -r '.code')" == "E_GLOBAL_SHADOW_CONFLICT" ]]
 rm -f "$HOME/.codex/config.toml"
 
+export OPENAI_API_KEY="env-contamination"
+env_preflight="$(_tv_runtime_preflight "codex" "oauth-demo" "$oauth_row")"
+[[ "$(echo "$env_preflight" | jq -r '.ok')" == "false" ]]
+[[ "$(echo "$env_preflight" | jq -r '.code')" == "E_ENV_CONFLICT" ]]
+unset OPENAI_API_KEY
+
 echo "smoke-ok"

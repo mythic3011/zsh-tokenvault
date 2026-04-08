@@ -542,7 +542,7 @@ tv_agent_codex_detect_env_conflicts() {
     done
 
     _tv_jq -n --argjson present "$present" '{
-        ok: true,
+        ok: (($present | length) == 0),
         details: {
             present_scrubbable_env: $present
         }
