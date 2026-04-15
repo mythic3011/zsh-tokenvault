@@ -29,7 +29,7 @@ tv_version() {
         if [[ "$json_output" == "1" ]]; then
             jq -n '{app_version: "7.0", schema_version: 1}'
         else
-            _tv_print "  ${_TV_WHT}TokenVault${_TV_RST} ${_TV_GRY}v7.0${_TV_RST}"
+            _tv_print "  ${_TV_WHT}TokenVault${_TV_RST} ${_TV_GRY}$(_tv_trf "tokenvault_version_short" "v%s" "7.0")${_TV_RST}"
         fi
         return 0
     fi
@@ -40,13 +40,13 @@ tv_version() {
         local app_ver schema_ver
         app_ver=$(jq -r '.app_version // "unknown"' "$TV_VERSION_FILE")
         schema_ver=$(jq -r '.schema_version // 0' "$TV_VERSION_FILE")
-        _tv_print "  ${_TV_WHT}TokenVault${_TV_RST} ${_TV_GRY}v${app_ver}${_TV_RST} ${_TV_GRY}(schema: ${schema_ver})${_TV_RST}"
+        _tv_print "  ${_TV_WHT}TokenVault${_TV_RST} ${_TV_GRY}$(_tv_trf "tokenvault_version_schema" "v%s (schema: %s)" "$app_ver" "$schema_ver")${_TV_RST}"
         
         # Show adapter versions
         local adapters
         adapters=$(jq -r '.adapters | to_entries[] | "\(.key): \(.value.adapter_version)"' "$TV_VERSION_FILE" 2>/dev/null)
         if [[ -n "$adapters" ]]; then
-            _tv_print "  ${_TV_GRY}Adapters:${_TV_RST}"
+            _tv_print "  ${_TV_GRY}$(_tv_tr "adapters_title" "Adapters:")${_TV_RST}"
             while IFS= read -r line; do
                 _tv_print "    ${_TV_GRY}${line}${_TV_RST}"
             done <<< "$adapters"
@@ -129,11 +129,11 @@ _tv_migrate_schema() {
     current=$(jq -r '.schema_version // 0' "$TV_VERSION_FILE")
     
     if (( current >= target )); then
-        _tv_print "  ${_TV_GRY}Schema already at version ${current}${_TV_RST}"
+        _tv_print "  ${_TV_GRY}$(_tv_trf "schema_already_at_version" "Schema already at version %s" "$current")${_TV_RST}"
         return 0
     fi
     
-    _tv_print "  ${_TV_GRY}Migrating schema from v${current} to v${target}...${_TV_RST}"
+    _tv_print "  ${_TV_GRY}$(_tv_trf "migrating_schema" "Migrating schema from v%s to v%s..." "$current" "$target")${_TV_RST}"
     
     # Backup before migration
     cp "$TV_VERSION_FILE" "${TV_VERSION_FILE}.bak.$(date +%s)"
@@ -146,7 +146,7 @@ _tv_migrate_schema() {
     jq --argjson ver "$target" '.schema_version = $ver' "$TV_VERSION_FILE" > "$tmp" \
         && mv -f "$tmp" "$TV_VERSION_FILE" || { rm -f "$tmp"; return 1; }
     
-    _tv_print "  ${_TV_GRN}✓ Schema migrated to v${target}${_TV_RST}"
+    _tv_print "  ${_TV_GRN}✓ $(_tv_trf "schema_migrated_to" "Schema migrated to v%s" "$target")${_TV_RST}"
 }
 
 # --- VERSIONING OPEN/CLOSE ---

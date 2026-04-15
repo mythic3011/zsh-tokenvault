@@ -23,14 +23,14 @@ tv-adapter-update() {
         esac
     done
     
-    [[ -z "$agent_id" ]] && { _tv_print "  ${_TV_RED}✗ Required: --agent <id>${_TV_RST}"; return 1; }
+    [[ -z "$agent_id" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_tr "required_agent_flag" "Required: --agent <id>")${_TV_RST}"; return 1; }
     
     _tv_banner "Adapter Update: ${agent_id}"
     
     # Check current version
     local current_version
     current_version=$(_tv_get_adapter_version "$agent_id")
-    _tv_print "  ${_TV_GRY}Current adapter version: ${current_version}${_TV_RST}"
+    _tv_print "  ${_TV_GRY}$(_tv_trf "current_adapter_version" "Current adapter version: %s" "$current_version")${_TV_RST}"
     
     # Check for agent updates
     local update_info
@@ -42,11 +42,10 @@ tv-adapter-update() {
     if [[ "$has_update" == "true" ]]; then
         local latest_version
         latest_version=$(echo "$update_info" | jq -r '.latest_version // "unknown"')
-        _tv_print "  ${_TV_YEL}⚠ Update available: ${current_version} → ${latest_version}${_TV_RST}"
+        _tv_print "  ${_TV_YEL}⚠ $(_tv_trf "adapter_update_available" "Update available: %s → %s" "$current_version" "$latest_version")${_TV_RST}"
         
         if [[ "$force" != "1" ]]; then
-            read "?  Install update? (y/N): " confirm
-            [[ "$confirm" =~ ^[Yy]$ ]] || { _tv_print "  ${_TV_GRY}Cancelled${_TV_RST}"; return 0; }
+            _tv_confirm "install_update_prompt" || { _tv_print "  ${_TV_GRY}$(_tv_tr "cancelled" "Cancelled")${_TV_RST}"; return 0; }
         fi
         
         # Update adapter version in version file
@@ -58,9 +57,9 @@ tv-adapter-update() {
             '.adapters[$id].adapter_version = $ver' "$TV_VERSION_FILE" > "$tmp" \
             && mv -f "$tmp" "$TV_VERSION_FILE" || { rm -f "$tmp"; return 1; }
         
-        _tv_print "  ${_TV_GRN}✓ Adapter updated to ${latest_version}${_TV_RST}"
+        _tv_print "  ${_TV_GRN}✓ $(_tv_trf "adapter_updated_to" "Adapter updated to %s" "$latest_version")${_TV_RST}"
     else
-        _tv_print "  ${_TV_GRN}✓ Adapter is up to date${_TV_RST}"
+        _tv_print "  ${_TV_GRN}✓ $(_tv_tr "adapter_up_to_date" "Adapter is up to date")${_TV_RST}"
     fi
 }
 

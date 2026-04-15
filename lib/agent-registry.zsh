@@ -78,15 +78,15 @@ _tv_fetch_agent_registry() {
 
 # Force update agent registry from remote
 tv-update-registry() {
-    _tv_banner "Update Agent Registry"
-    _tv_print "  ${_TV_GRY}Fetching from ${TV_AGENT_REGISTRY_REMOTE}...${_TV_RST}"
+    _tv_banner "$(_tv_tr "update_agent_registry_title" "Update Agent Registry")"
+    _tv_print "  ${_TV_GRY}$(_tv_trf "fetching_from_url" "Fetching from %s..." "$TV_AGENT_REGISTRY_REMOTE")${_TV_RST}"
     
     if _tv_fetch_agent_registry; then
         local count
         count=$(jq 'keys | length' "$TV_AGENT_REGISTRY_FILE" 2>/dev/null || echo 0)
-        _tv_print "  ${_TV_GRN}✓ Registry updated (${count} agents)${_TV_RST}"
+        _tv_print "  ${_TV_GRN}✓ $(_tv_trf "registry_updated_agents" "Registry updated (%s agents)" "$count")${_TV_RST}"
     else
-        _tv_print "  ${_TV_RED}✗ Failed to fetch registry from remote${_TV_RST}"
+        _tv_print "  ${_TV_RED}✗ $(_tv_tr "failed_fetch_registry_remote" "Failed to fetch registry from remote")${_TV_RST}"
         return 1
     fi
 }
@@ -162,7 +162,7 @@ _tv_register_agent() {
        }' "$TV_AGENT_REGISTRY_FILE" > "$tmp" \
        && mv -f "$tmp" "$TV_AGENT_REGISTRY_FILE" || { rm -f "$tmp"; return 1; }
     
-    _tv_print "  ${_TV_GRN}✓ Agent ${_TV_WHT}${agent_id}${_TV_RST}${_TV_GRN} registered${_TV_RST}"
+    _tv_print "  ${_TV_GRN}✓ $(_tv_trf "agent_registered" "Agent %s registered" "$agent_id")${_TV_RST}"
 }
 
 # Unregister an agent
@@ -173,7 +173,7 @@ _tv_unregister_agent() {
     
     local exists
     exists=$(jq -r --arg id "$agent_id" 'has($id)' "$TV_AGENT_REGISTRY_FILE")
-    [[ "$exists" != "true" ]] && { _tv_print "  ${_TV_RED}✗ Agent not found: ${agent_id}${_TV_RST}"; return 1; }
+    [[ "$exists" != "true" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_trf "agent_not_found" "Agent not found: %s" "$agent_id")${_TV_RST}"; return 1; }
     
     local tmp
     tmp=$(_tv_mktemp "$TV_DIR/.json_tmp.XXXXXX") || return 1
@@ -182,7 +182,7 @@ _tv_unregister_agent() {
     jq --arg id "$agent_id" 'del(.[$id])' "$TV_AGENT_REGISTRY_FILE" > "$tmp" \
        && mv -f "$tmp" "$TV_AGENT_REGISTRY_FILE" || { rm -f "$tmp"; return 1; }
     
-    _tv_print "  ${_TV_YEL}✓ Agent ${_TV_WHT}${agent_id}${_TV_RST}${_TV_YEL} unregistered${_TV_RST}"
+    _tv_print "  ${_TV_YEL}✓ $(_tv_trf "agent_unregistered" "Agent %s unregistered" "$agent_id")${_TV_RST}"
 }
 
 # Get agent config provider
@@ -228,10 +228,10 @@ _tv_get_agent_updater() {
 # Display agent registry
 # Usage: _tv_display_agent_registry
 _tv_display_agent_registry() {
-    _tv_banner "Agent Registry"
+    _tv_banner "$(_tv_tr "agent_registry_title" "Agent Registry")"
     
     if [[ ! -f "$TV_AGENT_REGISTRY_FILE" ]]; then
-        _tv_print "  ${_TV_GRY}(no agents registered)${_TV_RST}"
+        _tv_print "  ${_TV_GRY}$(_tv_tr "no_agents_registered" "(no agents registered)")${_TV_RST}"
         return 0
     fi
     

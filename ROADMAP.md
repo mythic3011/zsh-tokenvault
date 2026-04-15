@@ -5,6 +5,7 @@ This document outlines the future direction and planned improvements for TokenVa
 ## Vision
 
 TokenVault aims to be the most user-friendly and secure way to manage API keys and credentials in the terminal, with:
+
 - Zero friction for daily use (tab completion, smart defaults)
 - Enterprise-grade security (encryption, audit logging)
 - Multi-provider support (Anthropic, OpenAI, Gemini, custom)
@@ -13,6 +14,7 @@ TokenVault aims to be the most user-friendly and secure way to manage API keys a
 ## Current Status (v7.0+)
 
 ### ✅ Completed
+
 - Core vault functionality with AES-256-CBC encryption
 - Multi-provider support (Anthropic, OpenAI, Gemini, custom)
 - Profile-scoped defaults and model selection
@@ -23,9 +25,11 @@ TokenVault aims to be the most user-friendly and secure way to manage API keys a
 - Comprehensive documentation
 
 ### 🔄 In Progress
+
 - Bug fixes and stability improvements
 - Documentation enhancements
 - Test coverage expansion
+- muiltiple endpoint support for one provider
 
 ## Planned Features
 
@@ -193,6 +197,7 @@ None planned for v7.x. Major version bumps (v8.0+) may introduce breaking change
 ### Migration Path
 
 When breaking changes are introduced:
+
 1. Deprecation period (at least 2 releases)
 2. Clear migration guide
 3. Automated migration tool if possible
@@ -201,6 +206,7 @@ When breaking changes are introduced:
 ## Community Contributions
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+
 - How to contribute
 - Development setup
 - Code style guidelines
@@ -221,6 +227,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 ### Versioning
 
 TokenVault follows [Semantic Versioning](https://semver.org/):
+
 - **MAJOR** - Breaking changes
 - **MINOR** - New features (backward compatible)
 - **PATCH** - Bug fixes

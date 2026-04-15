@@ -25,17 +25,17 @@ tv-model-set() {
 
     [[ -n "$p_id" ]] && { _tv_validate_id "$p_id" || return 1; }
 
-    _tv_banner "Set Default Model"
-    _tv_menu scope "Apply to" 1 \
+    _tv_banner "$(_tv_tr "set_default_model_title" "Set Default Model")"
+    _tv_menu scope "apply_to_title" 1 \
         "provider" "(set default for all keys of a provider)" \
         "profile"  "(override for one specific profile)"
 
     if [[ "$scope" == "provider" ]]; then
-        _tv_menu prov "Provider" 1 \
+        _tv_menu prov "provider_title" 1 \
             "anthropic" "" "openai" "" "gemini" "" "custom" ""
 
         if [[ "$prov" == "anthropic" ]]; then
-            _tv_menu tier "Tier" 1 \
+            _tv_menu tier "tier_title" 1 \
                 "haiku"   "(fast / cheap)" \
                 "sonnet"  "(balanced)" \
                 "opus"    "(powerful)" \
@@ -44,7 +44,9 @@ tv-model-set() {
             tier="default"
         fi
 
-        _tv_print "\n  ${_TV_GRY}Fetching model list for ${prov}...${_TV_RST}"
+        local fetching_for
+        printf -v fetching_for "$(_tv_tr "fetching_model_list_for" "Fetching model list for %s...")" "$prov"
+        _tv_print "\n  ${_TV_GRY}${fetching_for}${_TV_RST}"
         local _vault_key=""
         if [[ -n "$_TV_MASTER_KEY" ]]; then
             local _pid
@@ -56,7 +58,7 @@ tv-model-set() {
             _base=$(jq -r --arg p "$_pid" '.[$p].base_url // ""' "$TV_PROFILES" 2>/dev/null)
         fi
         _tv_pick_model model "$prov" "${_base:-}" "$_vault_key"
-        [[ -z "$model" ]] && { _tv_print "  ${_TV_YEL}⚠ No model selected${_TV_RST}"; return 1; }
+        [[ -z "$model" ]] && { _tv_print "  ${_TV_YEL}⚠ $(_tv_tr "no_model_selected" "No model selected")${_TV_RST}"; return 1; }
 
         local tmp
         tmp=$(_tv_mktemp "$TV_DIR/.json_tmp.XXXXXX") || return 1
@@ -66,7 +68,7 @@ tv-model-set() {
         _tv_print "\n  ${_TV_GRN}✓ ${prov}.${tier} = ${model}${_TV_RST}"
     else
         if [[ -z "$p_id" ]]; then
-            _tv_print "\n  Profiles:"
+            _tv_print "\n  $(_tv_tr "profiles_title" "Profiles"):"
             local i=1
             local -a _pids
             while IFS= read -r pid; do
@@ -76,14 +78,14 @@ tv-model-set() {
                 _pids+=("$pid")
                 (( ++i ))
             done < <(jq -r 'keys[]' "$TV_PROFILES")
-            printf "\n  Choice: "
+            printf "\n  %s: " "$(_tv_tr "choice_prompt" "Choice")"
             read _c
             p_id="${_pids[${_c}]}"
         fi
-        [[ -z "$p_id" ]] && { _tv_print "  ${_TV_RED}✗ No profile selected${_TV_RST}"; return 1; }
+        [[ -z "$p_id" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_tr "no_profile_selected" "No profile selected")${_TV_RST}"; return 1; }
         local exists
         exists=$(jq -r --arg p "$p_id" 'has($p)' "$TV_PROFILES")
-        [[ "$exists" != "true" ]] && { _tv_print "  ${_TV_RED}✗ Profile not found: $p_id${_TV_RST}"; return 1; }
+        [[ "$exists" != "true" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_trf "profile_not_found" "Profile not found: %s" "$p_id")${_TV_RST}"; return 1; }
 
         local _row
         _row=$(jq -c --arg p "$p_id" '.[$p]' "$TV_PROFILES")
@@ -96,7 +98,7 @@ tv-model-set() {
             _vault_key=$(echo "$(_tv_crypto dec)" | jq -r --arg p "$p_id" '.[$p] // empty')
         fi
         _tv_pick_model model "$_prov" "$_base" "$_vault_key"
-        [[ -z "$model" ]] && { _tv_print "  ${_TV_YEL}⚠ No model selected${_TV_RST}"; return 1; }
+        [[ -z "$model" ]] && { _tv_print "  ${_TV_YEL}⚠ $(_tv_tr "no_model_selected" "No model selected")${_TV_RST}"; return 1; }
 
         local tmp
         tmp=$(_tv_mktemp "$TV_DIR/.json_tmp.XXXXXX") || return 1
@@ -118,10 +120,10 @@ tv-model-list() {
         esac
     done
 
-    _tv_banner "Models"
-    _tv_print "  ${_TV_WHT}Current provider defaults:${_TV_RST}"
+    _tv_banner "$(_tv_tr "models_title" "Models")"
+    _tv_print "  ${_TV_WHT}$(_tv_tr "current_provider_defaults" "Current provider defaults:")${_TV_RST}"
     if [[ "$(cat "$TV_MODELS")" == "{}" ]]; then
-        _tv_print "  ${_TV_GRY}(none configured)${_TV_RST}"
+        _tv_print "  ${_TV_GRY}$(_tv_tr "none_configured" "(none configured)")${_TV_RST}"
     else
         jq -r 'to_entries[] | "  \(.key): " + (.value | to_entries | map("\(.key)=\(.value)") | join("  "))' "$TV_MODELS" | \
         while IFS= read -r line; do _tv_print "  ${_TV_GRY}${line}${_TV_RST}"; done
@@ -131,45 +133,45 @@ tv-model-list() {
     if [[ -n "$p_id" ]]; then
         local row
         row=$(jq -c --arg p "$p_id" '.[$p] // empty' "$TV_PROFILES")
-        [[ -z "$row" ]] && { _tv_print "  ${_TV_RED}✗ Profile not found: $p_id${_TV_RST}"; return 1; }
+        [[ -z "$row" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_trf "profile_not_found" "Profile not found: %s" "$p_id")${_TV_RST}"; return 1; }
         target_prov=$(echo "$row" | jq -r '.provider')
         target_base=$(echo "$row" | jq -r '.base_url // ""')
-        [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ Run tv-unlock first${_TV_RST}"; return 1; }
+        [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_tr "run_tv_unlock_first" "Run tv-unlock first")${_TV_RST}"; return 1; }
         target_key=$(echo "$(_tv_crypto dec)" | jq -r --arg p "$p_id" '.[$p] // empty')
     elif [[ -n "$prov" ]]; then
         target_prov="$prov"
-        [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ Run tv-unlock first${_TV_RST}"; return 1; }
+        [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_tr "run_tv_unlock_first" "Run tv-unlock first")${_TV_RST}"; return 1; }
         local vault
         vault=$(_tv_crypto dec)
         local pid
         pid=$(jq -r --arg pv "$prov" \
             'to_entries | map(select(.value.provider==$pv and .value.status=="active")) | .[0].key // empty' \
             "$TV_PROFILES")
-        [[ -z "$pid" ]] && { _tv_print "  ${_TV_RED}✗ No active profile for: $prov${_TV_RST}"; return 1; }
+        [[ -z "$pid" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_trf "no_active_profile" "No active profile for: %s" "$prov")${_TV_RST}"; return 1; }
         target_base=$(jq -r --arg p "$pid" '.[$p].base_url // ""' "$TV_PROFILES")
         target_key=$(echo "$vault" | jq -r --arg p "$pid" '.[$p] // empty')
     else
-        _tv_menu _fetch_scope "Fetch live model list from" 1 \
+        _tv_menu _fetch_scope "fetch_live_model_list_title" 1 \
             "provider" "(by provider name)" \
             "profile"  "(by profile ID)" \
             "skip"     "(just show config above)"
         if [[ "$_fetch_scope" == "skip" ]]; then return 0; fi
 
         if [[ "$_fetch_scope" == "provider" ]]; then
-            _tv_menu target_prov "Provider" 1 \
+            _tv_menu target_prov "provider_title" 1 \
                 "anthropic" "" "openai" "" "gemini" "" "custom" ""
-            [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ Run tv-unlock first${_TV_RST}"; return 1; }
+            [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_tr "run_tv_unlock_first" "Run tv-unlock first")${_TV_RST}"; return 1; }
             local vault
             vault=$(_tv_crypto dec)
             local pid
             pid=$(jq -r --arg pv "$target_prov" \
                 'to_entries | map(select(.value.provider==$pv and .value.status=="active")) | .[0].key // empty' \
                 "$TV_PROFILES")
-            [[ -z "$pid" ]] && { _tv_print "  ${_TV_RED}✗ No active profile for: $target_prov${_TV_RST}"; return 1; }
+            [[ -z "$pid" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_trf "no_active_profile" "No active profile for: %s" "$target_prov")${_TV_RST}"; return 1; }
             target_base=$(jq -r --arg p "$pid" '.[$p].base_url // ""' "$TV_PROFILES")
             target_key=$(echo "$vault" | jq -r --arg p "$pid" '.[$p] // empty')
         else
-            _tv_print "\n  Profiles:"
+            _tv_print "\n  $(_tv_tr "profiles_title" "Profiles"):"
             local -a _pids2
             local i=1
             while IFS= read -r pid; do
@@ -179,7 +181,7 @@ tv-model-list() {
                 _pids2+=("$pid")
                 (( ++i ))
             done < <(jq -r 'keys[]' "$TV_PROFILES")
-            printf "\n  Choice: "
+            printf "\n  %s: " "$(_tv_tr "choice_prompt" "Choice")"
             read _c
             local sel="${_pids2[${_c}]}"
             [[ -z "$sel" ]] && return 1
@@ -187,19 +189,21 @@ tv-model-list() {
             row=$(jq -c --arg p "$sel" '.[$p]' "$TV_PROFILES")
             target_prov=$(echo "$row" | jq -r '.provider')
             target_base=$(echo "$row" | jq -r '.base_url // ""')
-            [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ Run tv-unlock first${_TV_RST}"; return 1; }
+            [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_tr "run_tv_unlock_first" "Run tv-unlock first")${_TV_RST}"; return 1; }
             target_key=$(echo "$(_tv_crypto dec)" | jq -r --arg p "$sel" '.[$p] // empty')
         fi
     fi
 
-    _tv_print "  ${_TV_GRY}Fetching from ${target_prov}...${_TV_RST}"
+    local fetching_from
+    printf -v fetching_from "$(_tv_tr "fetching_from_provider" "Fetching from %s...")" "$target_prov"
+    _tv_print "  ${_TV_GRY}${fetching_from}${_TV_RST}"
     local model_list
     model_list=$(_tv_fetch_models "$target_prov" "$target_base" "$target_key")
     if [[ -z "$model_list" ]]; then
-        _tv_print "  ${_TV_RED}✗ Could not fetch model list${_TV_RST}"
+        _tv_print "  ${_TV_RED}✗ $(_tv_tr "could_not_fetch_model_list" "Could not fetch model list")${_TV_RST}"
         return 1
     fi
-    _tv_print "  ${_TV_GRN}✓ Available models:${_TV_RST}\n"
+    _tv_print "  ${_TV_GRN}✓ $(_tv_tr "models_available" "Available models:")${_TV_RST}\n"
     local i=1
     while IFS= read -r m; do
         _tv_print "  ${_TV_GRY}${i})${_TV_RST} $m"
@@ -218,7 +222,7 @@ tv-codex-sync() {
             -AllowWireApi|--allow-wire-api) allow_wire_api=1; shift ;;
             -Yes|--yes) yes=1; shift ;;
             -H|--help|--h) show_help=1; shift ;;
-            *) _tv_print "  ${_TV_RED}✗ Unknown flag: $1${_TV_RST}"; return 1 ;;
+            *) _tv_print "  ${_TV_RED}✗ $(_tv_trf "unknown_flag" "Unknown flag: %s" "$1")${_TV_RST}"; return 1 ;;
         esac
     done
 
@@ -229,7 +233,7 @@ tv-codex-sync() {
         return 0
     fi
 
-    [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ Run tv-unlock first${_TV_RST}"; return 1; }
+    [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_tr "run_tv_unlock_first" "Run tv-unlock first")${_TV_RST}"; return 1; }
 
     local resolved_config="$config_path"
     if [[ -z "$resolved_config" ]]; then
@@ -266,9 +270,7 @@ tv-codex-sync() {
     if [[ "$dry_run" == "0" && "$yes" != "1" ]]; then
         _tv_print "  ${_TV_GRY}Will sync ${provider_count} provider(s) into TokenVault${_TV_RST}"
         local _confirm
-        printf "  Proceed with sync? (y/N): "
-        read _confirm
-        [[ "$_confirm" =~ ^[Yy]$ ]] || { _tv_print "  ${_TV_GRY}Cancelled${_TV_RST}"; return 0; }
+        _tv_confirm "proceed_sync_confirm" || { _tv_print "  ${_TV_GRY}$(_tv_tr "cancelled" "Cancelled")${_TV_RST}"; return 0; }
     fi
 
     local profiles_json

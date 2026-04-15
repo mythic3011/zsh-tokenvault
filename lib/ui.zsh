@@ -116,10 +116,12 @@ _tv_ask() {
     local _var="$1" _prompt="$2" _default="${3:-}" _secret="${4:-}"
     [[ -n "${(P)_var}" ]] && return 0
     local _val
+    local _label
+    _label=$(_tv_tr "$_prompt" "$_prompt")
     if [[ -n "$_default" ]]; then
-        print -Pn "  ${_prompt} [${_TV_GRY}${_default}${_TV_RST}]: "
+        print -Pn "  ${_label} [${_TV_GRY}${_default}${_TV_RST}]: "
     else
-        print -Pn "  ${_prompt}: "
+        print -Pn "  ${_label}: "
     fi
     if [[ "$_secret" == "1" ]]; then
         read -rs _val
@@ -136,17 +138,21 @@ _tv_menu() {
     local _var="$1" _title="$2" _def="$3"
     shift 3
     [[ -n "${(P)_var}" ]] && return 0
-    _tv_print "\n  ${_title}:"
+    local _label
+    _label=$(_tv_tr "$_title" "$_title")
+    _tv_print "\n  ${_label}:"
     local -a _vals _descs
     local i=1
     while [[ $# -ge 2 ]]; do
         _vals+=("$1")
         _descs+=("$2")
-        _tv_print "  ${_TV_GRY}${i})${_TV_RST} ${_vals[$i]}  ${_TV_GRY}${_descs[$i]}${_TV_RST}"
+        local _desc
+        _desc=$(_tv_tr "${_descs[$i]}" "${_descs[$i]}")
+        _tv_print "  ${_TV_GRY}${i})${_TV_RST} ${_vals[$i]}  ${_TV_GRY}${_desc}${_TV_RST}"
         (( ++i ))
         shift 2
     done
-    printf "\n  Choice [${_def}]: "
+    printf "\n  %s [%s]: " "$(_tv_tr "choice_prompt" "Choice")" "${_def}"
     read _c
     local _idx="${_c:-$_def}"
     _idx="${_idx//[^0-9]/}"
@@ -159,11 +165,11 @@ _tv_menu() {
 _tv_pick_model() {
     local _var="$1" _prov="$2" _base="$3" _key="$4"
     [[ -n "${(P)_var}" ]] && return 0
-    _tv_print "\n  ${_TV_GRY}Fetching model list...${_TV_RST}"
+    _tv_print "\n  ${_TV_GRY}$(_tv_tr "model_fetching" "Fetching model list...")${_TV_RST}"
     local _list
     _list=$(_tv_fetch_models "$_prov" "$_base" "$_key")
     if [[ -n "$_list" ]]; then
-        _tv_print "  ${_TV_GRN}✓ Got model list${_TV_RST}\n"
+        _tv_print "  ${_TV_GRN}✓ $(_tv_tr "got_model_list" "Got model list")${_TV_RST}\n"
         local -a _mlist
         local i=1
         while IFS= read -r m; do
@@ -171,8 +177,8 @@ _tv_pick_model() {
             _mlist+=("$m")
             (( ++i ))
         done <<< "$_list"
-        _tv_print "  ${_TV_GRY}0)${_TV_RST} Skip"
-        printf "\n  Default model [0]: "
+        _tv_print "  ${_TV_GRY}0)${_TV_RST} $(_tv_tr "skip_option" "Skip")"
+        printf "\n  %s [0]: " "$(_tv_tr "default_model_prompt" "Default model")"
         read _c
         local _cidx="${_c:-0}"
         _cidx="${_cidx//[^0-9]/}"
@@ -180,11 +186,20 @@ _tv_pick_model() {
             printf -v "$_var" '%s' "${_mlist[${_cidx}]}"
         fi
     else
-        _tv_print "  ${_TV_YEL}⚠ Could not fetch — enter manually${_TV_RST}"
-        printf "  Model ID (blank to skip): "
+        _tv_print "  ${_TV_YEL}⚠ $(_tv_tr "model_fetch_failed_manual" "Could not fetch — enter manually")${_TV_RST}"
+        printf "  %s: " "$(_tv_tr "model_id_prompt" "Model ID (blank to skip)")"
         read _m
         [[ -n "$_m" ]] && printf -v "$_var" '%s' "$_m"
     fi
+}
+
+_tv_confirm() {
+    local _prompt="$1"
+    local _default="${2:-y/N}"
+    local _response
+    print -Pn "  $(_tv_tr "$_prompt" "$_prompt") (${_default}): "
+    read _response
+    [[ "$_response" =~ ^[Yy]$ ]]
 }
 
 tv_ui_open() {

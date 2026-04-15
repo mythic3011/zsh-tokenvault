@@ -7,18 +7,20 @@ typeset -g TV_KEY_HELPERS_LOADED=1
 
 # tv-key-rotate: Add/rotate key for existing profile
 tv-key-rotate() {
-    [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ Run tv-unlock first${_TV_RST}"; return 1; }
+    [[ -z "$_TV_MASTER_KEY" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_tr "run_tv_unlock_first" "Run tv-unlock first")${_TV_RST}"; return 1; }
     
     local p_id="$1"
-    [[ -z "$p_id" ]] && { print -Pn "  Profile ID to rotate key: "; read p_id; }
+    [[ -z "$p_id" ]] && { print -Pn "  $(_tv_tr "rotate_key_prompt" "Profile ID to rotate key"): "; read p_id; }
     [[ -z "$p_id" ]] && return 1
     _tv_validate_id "$p_id" || return 1
     
     local exists
     exists=$(jq -r --arg p "$p_id" 'has($p)' "$TV_PROFILES")
-    [[ "$exists" != "true" ]] && { _tv_print "  ${_TV_RED}✗ Profile not found: $p_id${_TV_RST}"; return 1; }
+    [[ "$exists" != "true" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_trf "profile_not_found" "Profile not found: %s" "$p_id")${_TV_RST}"; return 1; }
     
-    _tv_banner "Rotate Key: ${p_id}"
+    local rotate_title
+    printf -v rotate_title "$(_tv_tr "rotate_key_title" "Rotate Key: %s")" "$p_id"
+    _tv_banner "$rotate_title"
     
     local row
     row=$(jq -c --arg p "$p_id" '.[$p]' "$TV_PROFILES")
@@ -28,16 +30,16 @@ tv-key-rotate() {
     auth_mode=$(echo "$row" | jq -r '.auth_mode // "key"')
     
     if [[ "$auth_mode" == "cli" ]]; then
-        _tv_print "  ${_TV_YEL}⚠ Profile uses CLI auth — no key to rotate${_TV_RST}"
+        _tv_print "  ${_TV_YEL}⚠ $(_tv_tr "profile_cli_auth_no_rotate" "Profile uses CLI auth — no key to rotate")${_TV_RST}"
         return 0
     fi
     
     # Get new key
-    printf "\n  New API Key: "
+    printf "\n  %s: " "$(_tv_tr "new_api_key_prompt" "New API Key")"
     read -rs new_key
     echo ""
     new_key=${new_key//[[:space:]]/}
-    [[ -z "$new_key" ]] && { _tv_print "  ${_TV_RED}✗ Key required${_TV_RST}"; return 1; }
+    [[ -z "$new_key" ]] && { _tv_print "  ${_TV_RED}✗ $(_tv_tr "key_required" "Key required")${_TV_RST}"; return 1; }
     
     # Update vault
     local v
@@ -53,7 +55,7 @@ tv-key-rotate() {
     jq --arg p "$p_id" --arg s "$short" '.[$p].short = $s' "$TV_PROFILES" > "$tmp" \
         && mv -f "$tmp" "$TV_PROFILES" || { rm -f "$tmp"; return 1; }
     
-    _tv_print "\n  ${_TV_GRN}✓ Key rotated for ${_TV_WHT}[$p_id]${_TV_RST}"
+    _tv_print "\n  ${_TV_GRN}✓ $(_tv_trf "key_rotated_for" "Key rotated for [%s]" "$p_id")${_TV_RST}"
     _tv_spawn_worker
 }
 
@@ -62,7 +64,7 @@ tv-key-status() {
     _tv_banner "Key Status"
     
     if [[ -z "$_TV_MASTER_KEY" ]]; then
-        _tv_print "  ${_TV_RED}✗ Vault locked — run tv-unlock first${_TV_RST}"
+        _tv_print "  ${_TV_RED}✗ $(_tv_tr "vault_locked_run_unlock" "Vault locked — run tv-unlock first")${_TV_RST}"
         return 1
     fi
     

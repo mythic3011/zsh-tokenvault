@@ -3,15 +3,16 @@
 typeset -g TV_AUTH_LOADED=1
 
 tv-unlock() {
-    read -rs "?🔑 Master Password: " pass
+    print -Pn "  🔑 $(_tv_tr "master_password_prompt" "Master Password"): "
+    read -rs pass
     echo ""
     _TV_MASTER_KEY="$pass"
     _tv_crypto dec &>/dev/null || {
         _TV_MASTER_KEY=""
-        _tv_print "  ${_TV_RED}✗ Wrong password${_TV_RST}"
+        _tv_print "  ${_TV_RED}✗ $(_tv_tr "wrong_password" "Wrong password")${_TV_RST}"
         return 1
     }
-    _tv_print "  ${_TV_GRN}✓ Vault unlocked${_TV_RST}"
+    _tv_print "  ${_TV_GRN}✓ $(_tv_tr "vault_unlocked" "Vault unlocked")${_TV_RST}"
     _tv_spawn_worker
 }
 
@@ -19,7 +20,7 @@ tv-lock() {
     _TV_MASTER_KEY=""
     _TV_IS_UNSAFE=0
     rm -f "$TV_UNSAFE_FILE" "$TV_PROMPT_CACHE"
-    _tv_print "  ${_TV_GRY}🔒 Vault locked${_TV_RST}"
+    _tv_print "  ${_TV_GRY}🔒 $(_tv_tr "vault_locked" "Vault locked")${_TV_RST}"
     _tv_spawn_worker
 }
 
@@ -27,9 +28,8 @@ tv-unsafe() {
     if [[ "$_TV_IS_UNSAFE" == "1" ]]; then
         tv-lock
     else
-        _tv_print "  ${_TV_RED}⚠  UNSAFE MODE — master key will be saved to disk${_TV_RST}"
-        read "?  Confirm? (y/N): " confirm
-        [[ "$confirm" =~ ^[Yy]$ ]] || return 1
+        _tv_print "  ${_TV_RED}⚠  $(_tv_tr "unsafe_mode_warning" "UNSAFE MODE — master key will be saved to disk")${_TV_RST}"
+        _tv_confirm "confirm_prompt" || return 1
         [[ -z "$_TV_MASTER_KEY" ]] && tv-unlock
         echo "$_TV_MASTER_KEY" > "$TV_UNSAFE_FILE" && chmod 600 "$TV_UNSAFE_FILE"
         _TV_IS_UNSAFE=1
